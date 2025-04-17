@@ -1,0 +1,87 @@
+server:
+  port: 80
+  #多端口配置
+  multiPorts: 8090,65535
+  ssl:
+    enabled:
+      false                             #SSL协议配置开开关
+    key-store:
+      loki.keystore
+    key-alias:
+      loki
+    key-store-password:
+      loki@2333
+    key-store-type:
+      JKS
+
+spring:
+  #出现错误时, 直接抛出异常(便于异常统一处理，否则捕获不到404)
+  mvc:
+    throw-exception-if-no-handler-found: true
+    static-path-pattern: /**
+
+    #不要为我们工程中的资源文件建立映射
+
+
+  web:
+    resources:
+      add-mappings: false
+  datasource:
+    url: jdbc:sqlite:data/loki.db # 创建的sqlite数据库所在路径
+    username: # 因为没有用户名和密码，所以这两个参数就没有值
+    password:
+    driver-class-name: org.sqlite.JDBC # sqlite驱动
+  thymeleaf:
+    prefix: classpath:/templates/
+
+
+# mybatis配置
+mybatis:
+  mapper-locations: classpath:mybatis/mapper/*Mapper.xml # 配置mapper.xml文件路径
+  type-aliases-package: net.thekingofduck.loki.entity # 实体类包名
+
+
+loki:
+  adminPath: lokiadmin                  #后台路径 http://HOST:ADMINPORT/ADMINPPATH
+  adminPort: 65535                      #后台端口 这个端口如果不在上面的端口列表里则后台无法访问
+  username: loki                        #后台路径 http://HOST:ADMINPORT/ADMINPPATH
+  password: loki@2333                   #后台路径 http://HOST:ADMINPORT/ADMINPPATH
+  templates: /resources/templates/      #模板渲染的路径 在jar包同级目录
+  statics: /resources/statics/          #模板静态资源(images,js,css)的路径 在jar包同级目录
+
+templates:
+  list:
+    default:
+      - maps: {
+        port: '80',
+        path: 'default/index.html',
+        code: '200',
+        header: {
+          Set-Cookie: "rememberMe=delete",
+          X-Powered-By: "PHP/5.4.7",
+          Server: "Platform/MacOSX; Release/Mac OS X Server; ) RapidLogic Rapid Logic/1 Rapid Logic/1.1 Raptor Simple, Secure Web Server 1.0 RealVNC/4.0 ReeCam IP Camera Resin/1 Resin/2.1.1 Resin/2.1.13 Resin/2.1.s030827 Resin/3.0.23 Roku UPnP/1.0 MiniUPnPd/1.4 Roku UPnP/1.0 Roku/8.1.6 RomPager/4.07 UPnP/1.0 RouterOS/6.43UPnP/1.0 MikroTik UPnP/1.0 roxen RT-G32 UPnP/1.0 MiniUPnPd/1.2 Rumpus rushhour sambar/5.1 Savant/3.1 ScriptEase/0.95 Security Console SentinelKeysServer/1 SentinelKeysServer/1.0 SentinelKeysServer/1.3.1 SentinelProtectionServer/7 SentinelProtectionServer/7.0 SentinelProtectionServer/7.1 SentinelProtectionServer/7.3 SEPM servermgrd serverseven Servlet 2.4; JBoss-4.0.4.GA (build: CVSTag=JBoss_4_0_4_GA date=200605151000)/Tomcat-5.5 Servlet 2.4; JBoss-4.2.3.GA (build: SVNTag=JBoss_4_2_3_GA date=200807181439)/JBossWeb-2.0 Servlet 2.4; Tomcat-5.0.28/JBoss-4.0.1sp1 (build: CVSTag=JBoss_4_0_1_SP1 date=200502160314) Servlet 2.5; JBoss-5.0/JBossWeb-2.1 Servlet/3.0; JBossAS-6 Serv-U/15.1.6.31 sfcHttpd SimpleHTTP/0.6 Python/2.7.6 SimpleHTTP/0.6 Python/3.4.0 Simple, Secure Web Server 1.1 SmoothWall Express/3.0 UPnP/1.0 miniupnpd/1.0 some thing UPnP/1.0 AVM FRITZ!WLAN Repeater 1750E 134.07.01 SonicWALL SonicWALL SSL-VPN Web Server SonicWALL SSLVPN Web Server Sophos Email Appliance Splunkd squid Squid Squid/2.3.STABLE1 squid/3.2.9-BZR squid/4.4 Stronghold/3.0 Apache/1.3.19 RedHat/3014c Stronghold/4.0 Apache/1.3.22 (Unix) mod_ssl/2.8.7 OpenSSL/0.9.6c mod_perl/1.26 Sun GlassFish Enterprise Server v2.1 Sun-ILOM-Web-Server/1.0 Sun-Java-System/Application-Server Sun Java System Application Server Platform Edition 9.0 Sun Java System Application Server Platform Edition 9.0_01 Sun-Java-System-Web-Proxy-Server/4.0 Sun-Java-System-Web-Proxy-Server/4.0.2 Sun-Java-System-Web-Server/7.0 Sunny WebBox Sun-ONE-Web-Proxy-Server/3.6-SP4 Sun-ONE-Web-Server/6.1 support@arraynetworks.net Synology/DSM/192.168.1.100 Synology/DSM/stuff TBS/R2 UPnP/1.0 MiniUPnPd/1.2 Tengine Tengine/2.0.0 thin 1.2.4 codename Flaming Astroboy thin 1 codename Flaming Astroboy thttpd thttpd/2.04 10aug98 thttpd/2.19-MX Jan 24 2006 thttpd/2.20b thttpd/2.21b PHP/20030920 thttpd/2.23beta1 26may2002 tivo-httpd-1:20.7.4.RC35-D18-6:D18 Tomato UPnP/1.0 MiniUPnPd/1.2 Tomato UPnP/1.0 MiniUPnPd/1.4 Tomcat/2.1 Tomcat Web Server/3.1M1 (JSP 1.1; Servlet 2.2; Java 1.3.1; AIX 5.3 ppc; java.vendor=IBM Corporation) Tomcat Web Server/3.2.2 (JSP 1.1; Servlet 2.2; Java 1.3.1; Windows 2000 5.0 x86; java.vendor=Sun Microsystems Inc.) Tomcat Web Server/3.2.2 (JSP 1.1; Servlet 2.2; Java 1.4.2_13; Windows 2003 5.2 x86; java.vendor=Sun Microsystems Inc.) Tomcat Web Server/3.3.1 Final ( JSP 1.1; Servlet 2.2 ) TornadoServer/4.0.2 TwistedWeb/16.4.0 TwistedWeb/16.5.0rc2 TwistedWeb/2.5.0 Ubuntu/10.04 UPnP/1.0 miniupnpd/1.0 Ubuntu/10.10 UPnP/1.0 miniupnpd/1.0 Ubuntu/7.10 UPnP/1.0 miniupnpd/1.0 Ubuntu/9.04 UPnP/1.0 miniupnpd/1.0 Ubuntu/bionic UPnP/1.0 MiniUPnPd/1.4 Ubuntu/hardy UPnP/1.0 MiniUPnPd/1.4 Ubuntu/jaunty UPnP/1.0 MiniUPnPd/1.4 Ubuntu/karmic UPnP/1.0 MiniUPnPd/1.4 Ubuntu/lucid UPnP/1.0 MiniUPnPd/1.4 Ubuntu/maverick UPnP/1.0 MiniUPnPd/1.4 Ubuntu/natty UPnP/1.0 MiniUPnPd/1.4 Ubuntu/oneiric UPnP/1.0 MiniUPnPd/1.4 Ubuntu/precise UPnP/1.0 MiniUPnPd/1.4 Ubuntu/quantal UPnP/1.0 MiniUPnPd/1.4 Ubuntu/raring UPnP/1.0 MiniUPnPd/1.4 Ubuntu/saucy UPnP/1.0 MiniUPnPd/1.4 Ubuntu/trusty UPnP/1.0 MiniUPnPd/1.4 Ubuntu/utopic UPnP/1.0 MiniUPnPd/1.4 Ubuntu/xenial UPnP/1.0 MiniUPnPd/1.4 Ubuntu/yakkety UPnP/1.0 MiniUPnPd/1.4 uc-httpd/1.0.0 Ultraseek Unknown/0.0 UPnP/1.0 Conexant-EmWeb/R6_1_0 Unknown/0.0 UPnP/1.0 GlobespanVirata-EmWeb/R6_1_0 Unknown/0.0 UPnP/1.0 Virata-EmWeb/R6_1_0 UOS UPnP/1.0, DLNADOC/1.50, Platinum/0.5.1 UPnP/1.0, DLNADOC/1.50, Platinum/0.5.3.0 UPnP/1.0, DLNADOC/1.50, Platinum/0.5.4.0 UPnP/1.0, DLNADOC/1.50, Platinum/0.6.6.0 UPS_Server/1 UPS_Server/1.0 Varnish Varnish-Cache VCS-VIDOS-NVR Virata-EmWeb/R5_3_0 Virata-EmWeb/R5_3_2 Virata-EmWeb/R6_0_1 Virata-EmWeb/R6_1_0 Virata-EmWeb/R6_2_0 Virata-EmWeb/R6_2_1 vqserver WebLogic Server 7.0 SP4 Tue Aug 12 11:22:26 PDT 2003 WebLogic Server 8.1 SP3 Tue Jun 29 23:11:19 PDT 2004 404973 WebLogic WebLogic Server 6.1 SP4  11/08/2002 21:50:43 #221641 WEBrick/1.3.1 (Ruby/1.9.3/2013-02-22) Web-Server/3.0 WebSitePro/2.4 WebSphere Application Server/5.0 WebSphere Application Server/6.1 Windows_7-x86-6.1, UPnP/1.0, PMS/1.10.51 Windows_7-x86-6.1, UPnP/1.0, PMS/1.20 Windows_7-x86-6.1, UPnP/1.0, PMS/1.20.409 Windows_7-x86-6.1, UPnP/1.0, PMS/1.20.412 Windows_7-x86-6.1, UPnP/1.0, PMS/1.22.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.25.1 Windows_7-x86-6.1, UPnP/1.0, PMS/1.30.1 Windows_7-x86-6.1, UPnP/1.0, PMS/1.40.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.50.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.50.1 Windows_7-x86-6.1, UPnP/1.0, PMS/1.51.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.52.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.52.1 Windows_7-x86-6.1, UPnP/1.0, PMS/1.53.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.54.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.60.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.70.1 Windows_7-x86-6.1, UPnP/1.0, PMS/1.71.0 Windows_7-x86-6.1, UPnP/1.0, PMS/1.72.0 Windows_XP-amd64-5.2, UPnP/1.0, PMS/1.54.0 Windows_XP-x86-5.1, UPnP/1.0, PMS/1.20.400 WindRiver-WebServer/4.4 WMServer/9.1.1.3841 Xitami"
+        },
+        respbody: 'error',
+      }
+    tongda:
+      - maps: {
+        port: '8080',
+        path: 'tongda/index.html',
+        code: '200',
+        header: {
+          Set-Cookie: "phpsession=123",
+          Server: "apache"
+        },
+        respbody: 'error',
+      }
+    seeyon:
+      - maps: {
+        port: '8090',
+        path: 'seeyon/index.html',
+        code: '200',
+        header: {
+          Set-Cookie: "jsessionid=123",
+          Server: "nginx"
+        },
+        respbody: 'error',
+      }
