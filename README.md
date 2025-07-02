@@ -9,7 +9,7 @@ Releases下载：[https://github.com/TheKingOfDuck/Loki/releases/tag/0.2](https:
   * 20210124 实现配置指定端口指向指定模板文件
   * 20210131 捕获所有数据，基本功能实现。修改默认页面。
 
-  
+
 ## 技术栈
 
 springboot + thymeleaf + sqlite
@@ -123,3 +123,4 @@ templates:
 ### 待处理
 
 * 自定义报错
+* test
