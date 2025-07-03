@@ -18,7 +18,17 @@ public class Security {
     static Log log = LogFactory.get(Thread.currentThread().getStackTrace()[1].getClassName());
 
     public static boolean check(HttpServletRequest request) {
-        String url = request.getRequestURI();
-        return !url.contains("..");
+        try {
+            String url = request.getRequestURI();
+            String decodedUrl = URLDecoder.decode(url, "UTF-8");
+            if (url.contains("..") || decodedUrl.contains("..")) {
+                log.warn("检测到目录遍历尝试: " + url);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("安全检查异常", e);
+            return false;
+        }
     }
 }

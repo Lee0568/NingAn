@@ -13,12 +13,8 @@ import cn.hutool.log.LogFactory;
 import java.util.Base64;
 
 /**
- * Project: loki
- * Date:2021/1/8 下午11:19
- * @author CoolCat
- * @version 1.0.0
- * Github:https://github.com/TheKingOfDuck
- * When I wirting my code, only God and I know what it does. After a while, only God knows.
+ * Project: ningan
+ * 换到java17，修改了这两个函数
  */
 
 public class Crypto {

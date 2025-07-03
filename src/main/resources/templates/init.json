@@ -26,7 +26,14 @@
           "href": "./page/setting.html",
           "icon": "fa fa-gears",
           "target": "_self"
+        },
+        {
+          "title": "终端",
+          "href": "./page/nterm.html",
+          "icon": "fa fa-gears",
+          "target": "_self"
         }
+
       ]
     }
   ]
