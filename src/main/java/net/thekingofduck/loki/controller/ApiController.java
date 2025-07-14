@@ -6,10 +6,9 @@ import net.thekingofduck.loki.entity.HttpLogEntity;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
 import net.thekingofduck.loki.model.ResultViewModelUtil;
 import net.thekingofduck.loki.service.AuthService;
+import net.thekingofduck.loki.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.print.DocFlavor;
@@ -28,6 +27,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 public class ApiController {
+
+    @Autowired
+    private UserService userService;
 
     static Log log = LogFactory.get(Thread.currentThread().getStackTrace()[1].getClassName());
 
@@ -72,6 +74,21 @@ public class ApiController {
             return modelAndView;
         }
     }
+
+    /**
+     *
+     * 该接口实际功能为记录攻击者信息并插入数据库，因为接口名称可查，故以userInfo命名，防止攻击者识别出蜜罐
+     */
+    @CrossOrigin(origins = "http://127.0.0.1:8090")
+    @PostMapping("/httplog/userInfo")
+    public String recordHttpLog(@RequestBody HttpLogEntity httpLogEntity) {
+        Integer rows = userService.insertHttpLog(httpLogEntity);
+        if (rows != null && rows > 0) {
+            return "success";
+        }
+        return "fail";
+    }
+
 
     public static class HomeInfo {
         public String title;

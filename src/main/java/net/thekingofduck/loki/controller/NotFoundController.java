@@ -75,7 +75,7 @@ public class NotFoundController implements ErrorController {
         return currentTemplate;
     }
 
-    @Override
+
     public String getErrorPath() {
         return null;
     }

@@ -13,14 +13,6 @@ import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.Map;
 
-/**
- * Project: loki
- * Date:2021/1/8 下午10:43
- * @author CoolCat
- * @version 1.0.0
- * Github:https://github.com/TheKingOfDuck
- * When I wirting my code, only God and I know what it does. After a while, only God knows.
- */
 
 public class AuthService {
 
@@ -90,6 +82,8 @@ public class AuthService {
             return false;
         }
     }
+
+
 
 
     public static void main(String[] args) {

@@ -77,6 +77,7 @@ public class LokiFilter implements Filter{
                 String headerStr = new String(Base64.getEncoder().encode(getHeaders(request).getBytes(StandardCharsets.UTF_8)));
                 String parameter = request.getQueryString();
                 if (!new AuthService().check(request)){
+
                     httpLogMapper.addHttpLog(ip,method,path,parameter, headerStr, body,getTime());
                 }
             }
