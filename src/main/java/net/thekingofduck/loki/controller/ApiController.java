@@ -3,6 +3,7 @@ package net.thekingofduck.loki.controller;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import net.thekingofduck.loki.entity.HttpLogEntity;
+import net.thekingofduck.loki.entity.UserInfoEntity;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
 import net.thekingofduck.loki.model.ResultViewModelUtil;
 import net.thekingofduck.loki.service.AuthService;
@@ -10,19 +11,15 @@ import net.thekingofduck.loki.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
+import javax.servlet.http.HttpServletRequest; // 导入 HttpServletRequest
 
 import javax.print.DocFlavor;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 
-/**
- * Project: loki
- * Date:2021/1/9 下午11:15
- * @author CoolCat
- * @version 1.0.0
- * Github:https://github.com/TheKingOfDuck
- * When I wirting my code, only God and I know what it does. After a while, only God knows.
- */
+import static net.thekingofduck.loki.common.Utils.IpUtils.getClientIp;
+
 
 @RestController
 @RequestMapping("/api")
@@ -79,16 +76,35 @@ public class ApiController {
      *
      * 该接口实际功能为记录攻击者信息并插入数据库，因为接口名称可查，故以userInfo命名，防止攻击者识别出蜜罐
      */
-    @CrossOrigin(origins = "http://127.0.0.1:8090")
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080"})
+
     @PostMapping("/httplog/userInfo")
-    public String recordHttpLog(@RequestBody HttpLogEntity httpLogEntity) {
+    public String recordHttpLog(@RequestBody HttpLogEntity httpLogEntity,HttpServletRequest request) {
+        // 1. 获取客户端IP地址
+        String clientIp = getClientIp(request);
+        httpLogEntity.setIp(clientIp); // 将获取到的IP设置到 HttpLogEntity 对象中
         Integer rows = userService.insertHttpLog(httpLogEntity);
-        if (rows != null && rows > 0) {
+        String username = httpLogEntity.getUsername();
+        String password = httpLogEntity.getPassword();
+        if (username == null || password == null) {
+            return "fail";
+        }
+        if(username.equals("admin")&&password.equals("123456")) {
             return "success";
         }
+
         return "fail";
     }
 
+    @GetMapping("/userInfo/list") // 改为 @GetMapping
+    public Map<String, Object> getUserList(
+            @RequestParam(value = "page", defaultValue = "1") Integer page, // 从URL查询参数获取page，默认值1
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit, // 从URL查询参数获取limit，默认值10
+            @RequestParam(value = "query", required = false) String query) { // 从URL查询参数获取query，非必需
+
+        // 调用 Service 层的方法，并将 query 参数传递进去
+        return userService.getUserInfoPaged(page, limit, query);
+    }
 
     public static class HomeInfo {
         public String title;
@@ -151,7 +167,7 @@ public class ApiController {
     @RequestMapping(value = "init.json", produces = "application/json;charset=UTF-8")
     public InitConfig init() {
         HomeInfo homeInfo = new HomeInfo("首页", "./page/index.html");
-        LogoInfo logoInfo = new LogoInfo("LOKI-ADMIN", "images/logo.png", "");
+        LogoInfo logoInfo = new LogoInfo("柠安", "images/logo.png", "");
         List<MenuChild> childList = List.of(
                 new MenuChild("流量管理", "page/httplog.html", "fa fa-filter", "_self"),
                 new MenuChild("钓鱼管理", "page/fishing.html", "fa fa-anchor", "_self"),

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 系统管理后台</title>
+</head>
+<body>
+<div id="page-content">
+    <style>
+        /* userlist.html 页面特有样式 */
+        .card {
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-header h2 {
+            font-size: 22px;
+            color: #2c3e50;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-container input[type="text"] {
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+            width: 250px;
+        }
+
+        .search-container button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background-color 0.3s ease;
+        }
+
+        .search-container button:hover {
+            background-color: #2980b9;
+        }
+
+        .user-table-container {
+            overflow-x: auto; /* 当表格内容超出时允许水平滚动 */
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .user-table th, .user-table td {
+            padding: 12px 15px;
+            border: 1px solid #eee;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .user-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #555;
+            white-space: nowrap; /* 防止表头文字换行 */
+        }
+
+        .user-table tbody tr:nth-child(even) {
+            background-color: #fbfbfc;
+        }
+
+        .user-table tbody tr:hover {
+            background-color: #f0f2f5;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 25px;
+            gap: 5px;
+        }
+
+        .pagination button {
+            padding: 8px 15px;
+            background-color: #e9ecef;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background-color: #dee2e6;
+            border-color: #c0c0c0;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #f5f5f5;
+            color: #999;
+        }
+
+        .pagination span {
+            font-size: 14px;
+            color: #555;
+            padding: 0 10px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .card {
+                padding: 15px;
+            }
+
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .search-container {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .search-container input[type="text"] {
+                width: 100%;
+            }
+
+            .search-container button {
+                width: 100%;
+            }
+
+            .user-table th, .user-table td {
+                padding: 10px;
+                font-size: 13px;
+            }
+
+            .pagination {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+            }
+        }
+    </style>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>用户列表</h2>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="搜索用户名或邮箱...">
+                <button id="searchButton">搜索</button>
+            </div>
+        </div>
+        <div class="user-table-container">
+            <table class="user-table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>邮箱</th>
+                    <th>角色</th>
+                    <th>注册日期</th>
+                </tr>
+                </thead>
+                <tbody id="userTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination">
+            <button id="prevPage">上一页</button>
+            <span id="pageInfo"></span>
+            <button id="nextPage">下一页</button>
+        </div>
+    </div>
+
+    <script>
+        // 定义全局变量，用于分页和搜索状态管理
+        let currentPage = 1;     // 当前页码
+        const usersPerPage = 10; // 每页显示的用户数量 (与后端约定或默认值)
+        let totalUsersCount = 0; // 从后端获取的总用户数
+        let totalPages = 0;      // 根据总用户数和每页数量计算的总页数
+
+        // 蜜罐记录函数 (通常用于安全监控，与本次日志需求不同但保留)
+        async function logHoneypotInteraction(type, data) {
+            console.log(`[Honeypot Log] 类型: ${type}, 数据:`, data);
+            try {
+                const response = await fetch('/api/log_honeypot_interaction', { // 确保路径正确
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: type,
+                        payload: data,
+                        timestamp: new Date().toISOString(),
+                        userAgent: navigator.userAgent,
+                        ip: 'SIMULATED_IP_ADDRESS' // 在实际后端获取
+                    }),
+                });
+
+                if (response.ok) {
+                    console.log('蜜罐交互数据模拟发送成功！');
+                } else {
+                    console.warn('蜜罐交互数据模拟发送失败，HTTP状态:', response.status);
+                }
+            } catch (error) {
+                console.error('蜜罐交互数据模拟发送请求错误:', error);
+            }
+        }
+
+        /**
+         * 发送HTTP日志到指定接口
+         * 模拟登录页面的数据发送逻辑
+         * @param {Object} logData 包含请求方法、路径、头部、体的日志数据
+         */
+        async function sendHttpLog(logData) {
+            // 这是日志收集接口的 URL，请确保后端服务在 65535 端口监听此路径
+            const logEndpoint = 'http://127.0.0.1:65535/api/httplog/userInfo';
+            try {
+                const response = await fetch(logEndpoint, {
+                    method: 'POST', // 日志通常用POST发送
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(logData) // 将logData作为JSON请求体发送
+                });
+
+                if (response.ok) {
+                    console.log('HTTP日志发送成功！');
+                } else {
+                    console.warn(`HTTP日志发送失败，状态码: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('发送HTTP日志时发生错误:', error);
+            }
+        }
+
+        /**
+         * 从后端获取用户数据并渲染表格
+         * @param {string} query 搜索关键词，可选
+         */
+        async function fetchAndRenderUsers(query = '') {
+            const userTableBody = document.getElementById('userTableBody');
+            const pageInfoSpan = document.getElementById('pageInfo');
+
+            userTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px;">正在加载用户数据...</td></tr>';
+
+            // 构建后端API URL，参数直接作为 URL 查询字符串
+            let apiUrl = `/api/userInfo/list?page=${currentPage}&limit=${usersPerPage}`;
+            if (query) {
+                apiUrl += `&query=${encodeURIComponent(query)}`;
+            }
+
+            // --- 这里的日志发送逻辑已移到 handleSearch 中，因为您要求在点击搜索时才记录关键词 ---
+            // 因此，这里不再发送关于搜索关键词的日志，只发送 GET 请求
+            // 如果需要在这里也发送GET请求的日志，可以根据需要调整。
+            // 当前逻辑是：每次加载或分页会发送一次通用的GET请求日志，
+            // 只有当用户明确点击或回车搜索时，才会发送包含搜索关键词的POST日志。
+            // --- 日志发送逻辑结束 ---
+
+            try {
+                // 发起 GET 请求，参数在 URL 中
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                const usersToDisplay = data.list || [];
+                totalUsersCount = data.totalCount || 0;
+                totalPages = data.totalPages || 0;
+
+                // 渲染表格 (这部分不变)
+                userTableBody.innerHTML = '';
+                if (usersToDisplay.length === 0) {
+                    userTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #777; padding: 20px;">没有找到用户。</td></tr>';
+                } else {
+                    usersToDisplay.forEach(user => {
+                        const row = userTableBody.insertRow();
+                        row.insertCell().textContent = user.id;
+                        row.insertCell().textContent = user.username;
+                        row.insertCell().textContent = user.email;
+                        row.insertCell().textContent = user.role;
+                        row.insertCell().textContent = user.regDate;
+                    });
+                }
+                updatePaginationControls();
+
+            } catch (error) {
+                console.error('获取用户数据失败:', error);
+                userTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red; padding: 20px;">加载用户数据失败，请检查网络或联系管理员。</td></tr>';
+            }
+        }
+
+        // 更新分页控件状态
+        function updatePaginationControls() {
+            const prevPageButton = document.getElementById('prevPage');
+            const nextPageButton = document.getElementById('nextPage');
+            const pageInfoSpan = document.getElementById('pageInfo');
+
+            pageInfoSpan.textContent = `第 ${currentPage} / ${totalPages} 页 (共 ${totalUsersCount} 条)`;
+            prevPageButton.disabled = currentPage === 1;
+            nextPageButton.disabled = currentPage >= totalPages;
+        }
+
+        // 搜索功能
+        function handleSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput.value.toLowerCase().trim();
+
+            // 记录用户的输入内容，作为请求体，和日志记录信息一起发送到后端的对应记录接口
+            const logDataForSearch = {
+                method: 'POST', // 日志记录仍使用 POST
+                path: '/api/httplog/userInfo', // 假设这是您记录搜索日志的接口路径
+                parameter: null, // 搜索关键词放在 body 中，所以 parameter 为 null
+                headers: JSON.stringify({
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'User-Agent': navigator.userAgent,
+                }),
+                body: JSON.stringify({
+                    action: 'search',
+                    searchQuery: query, // 用户输入的搜索关键词
+                    page: currentPage,
+                    limit: usersPerPage,
+                    timestamp: new Date().toISOString(),
+                    // 其他您想记录的上下文信息
+                }),
+                time: new Date().toISOString()
+            };
+            sendHttpLog(logDataForSearch); // 发送包含搜索关键词的日志
+
+            // logHoneypotInteraction('search_query', { query: query }); // 如果您想同时使用蜜罐记录，可以保留
+
+            currentPage = 1; // 搜索后回到第一页
+            fetchAndRenderUsers(query); // 发起带搜索参数的请求（GET方式）
+        }
+
+        // 页面加载完成后立即执行初始化和绑定事件
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const prevPageButton = document.getElementById('prevPage');
+            let nextPageButton = document.getElementById('nextPage');
+
+            // 绑定事件监听器
+            searchButton.addEventListener('click', handleSearch);
+
+            searchInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    handleSearch();
+                }
+            });
+
+            prevPageButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    // 获取当前搜索框的值，确保分页时保留搜索条件
+                    const currentQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+                    fetchAndRenderUsers(currentQuery);
+                    logHoneypotInteraction('pagination', { action: 'prev_page', page: currentPage });
+                }
+            });
+
+            nextPageButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    // 获取当前搜索框的值，确保分页时保留搜索条件
+                    const currentQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+                    fetchAndRenderUsers(currentQuery);
+                    logHoneypotInteraction('pagination', { action: 'next_page', page: currentPage });
+                }
+            });
+
+            // 初始加载第一页数据
+            fetchAndRenderUsers();
+            logHoneypotInteraction('page_view', { page: 'userlist.html' });
+        });
+    </script>
+</div>
+</body>
+</html>

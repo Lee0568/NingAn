@@ -63,21 +63,33 @@ templates:
         },
         respbody: 'error',
       }
-    tongda:
-      - maps: {
+
+    admin:
+      - maps: { # index.html 的配置
         port: '8080',
-        path: 'tongda/index.html',
+        path: '/admin/index.html',
         code: '200',
         header: {
           Set-Cookie: "phpsession=123",
           Server: "apache"
         },
-        respbody: 'error',
+        respbody: '<html><body><h1>欢迎来到首页！</h1></body></html>' # 实际的HTML内容
       }
-    seeyon:
+      - maps: { # userlist.html 的配置
+        port: '8080',
+        path: '/admin/userlist.html',
+        code: '200',
+        header: {
+          Set-Cookie: "phpsession=123",
+          Server: "apache"
+        },
+        respbody: '<html><body><h2>用户列表</h2><p>这里是用户管理内容。</p></body></html>' # 实际的HTML内容
+      }
+
+    bee:
       - maps: {
         port: '8090',
-        path: 'seeyon/index.html',
+        path: 'bee/login.html',
         code: '200',
         header: {
           Set-Cookie: "jsessionid=123",

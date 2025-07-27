@@ -1,75 +1,40 @@
 package net.thekingofduck.loki.controller;
 
-import cn.hutool.log.Log;
-import cn.hutool.log.LogFactory;
-
-//import net.thekingofduck.loki.entity.TemplateEntity;
-//import net.thekingofduck.loki.core.ResponseHandler;
-import net.thekingofduck.loki.common.Utils;
-import net.thekingofduck.loki.entity.TemplateEntity;
-import net.thekingofduck.loki.mapper.HttpLogMapper;
-import org.aspectj.lang.annotation.After;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.util.Map;
-
-/**
- * Project: loki
- * Date:2021/1/8 下午7:23
- * @author CoolCat
- * @version 1.0.0
- * Github:https://github.com/TheKingOfDuck
- * When I wirting my code, only God and I know what it does. After a while, only God knows.
- */
-
 @Controller
-public class HoneypotController {
+@RequestMapping("/admin")
+public class HoneypotController { // 建议重命名为 AdminController
 
-    static Log log = LogFactory.get(Thread.currentThread().getStackTrace()[1].getClassName());
-
-    @SuppressWarnings("all")
-    @Autowired
-    HttpLogMapper httpLogMapper;
-
-    @Autowired
-    private TemplateEntity templates;
-
-    @RequestMapping("/*")
-    public String honeypot(HttpServletRequest request, HttpServletResponse response) {
-
-        //获取当前模板名称
-        String[] templateNames = templates.getList().keySet().toArray(new String[0]);
-        String currentTemplateName = "default";
-        for (String templateName:templateNames) {
-
-            Map template = (Map) templates.getList().get(templateName).get(0).get("maps");
-            int templatePort = Integer.parseInt((String) template.get("port"));
-
-            if (templatePort == request.getServerPort()){
-                currentTemplateName = templateName;
-            }
-        }
-        log.info(currentTemplateName);
-
-        //获取当前模板路径
-        Map template = (Map) templates.getList().get(currentTemplateName).get(0).get("maps");
-        String currentTemplate = String.format("%s",template.get("path")).replaceAll(".html","");
-
-        //设置响应头信息
-        int code = Integer.parseInt((String) template.get("code"));
-        response.setStatus(code);
-        Map headers = (Map)template.get("header");
-        for (Object key:headers.keySet()) {
-            String headerKey = (String) key;
-            String headerValue = (String)headers.get(headerKey);
-            response.addHeader(headerKey,headerValue);
-        }
-
-        return currentTemplate;
+    // 主框架页面
+    @GetMapping("/index.html")
+    public String showIndexPage() {
+        return "admin/index"; // 返回主框架页面
     }
 
+    // 基础列表内容片段
+    @GetMapping("/dashboard_content.html") // 新增这个映射
+    public String showDashboardContent() {
+        return "admin/dashboard_content"; // 返回基础列表的内容片段
+    }
+
+    // 用户管理内容片段
+    @GetMapping("/userlist.html")
+    public String showUserListPage() {
+        return "admin/userlist"; // 返回用户列表内容片段页面
+    }
+
+    // 命令执行内容片段
+    @GetMapping("/command_exec.html")
+    public String showCommandExecPage() {
+        return "admin/command_exec"; // 返回命令执行内容片段页面
+    }
+
+    // SQL 查询内容片段
+    @GetMapping("/sql_query.html")
+    public String showSqlQueryPage() {
+        return "admin/sql_query"; // 返回 SQL 查询内容片段页面
+    }
 }
