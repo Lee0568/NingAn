@@ -1,6 +1,9 @@
 package net.thekingofduck.loki.service;
 
 import net.thekingofduck.loki.common.Crypto;
+import net.thekingofduck.loki.mapper.AdminUserMapper;
+import net.thekingofduck.loki.service.AdminUserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.yaml.snakeyaml.Yaml;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
@@ -20,6 +23,14 @@ public class AuthService {
 
     public static String username;
     public static String password;
+
+    // 注入AdminUserService
+    private static AdminUserService adminUserService;
+    
+    @Autowired
+    public void setAdminUserService(AdminUserService adminUserService) {
+        AuthService.adminUserService = adminUserService;
+    }
 
     public static String getUsername() {
         return username;
@@ -80,6 +91,23 @@ public class AuthService {
             return false;
         }catch (Exception e){
             return false;
+        }
+    }
+    
+    /**
+     * 验证管理员用户凭据（使用数据库）
+     * @param inputUsername 输入的用户名
+     * @param inputPassword 输入的密码
+     * @return 验证是否成功
+     */
+    public static boolean validateAdminCredentials(String inputUsername, String inputPassword) {
+        // 如果AdminUserService可用，使用数据库验证
+        if (adminUserService != null) {
+            return adminUserService.validateAdminUser(inputUsername, inputPassword);
+        }
+        // 否则使用原来的配置文件验证方式
+        else {
+            return inputUsername.equals(getUsername()) && inputPassword.equals(getPassword());
         }
     }
 

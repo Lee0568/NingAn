@@ -1,10 +1,163 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Title</title>
+    <meta charset="utf-8">
+    <title>Terminal</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <style>
+        .terminal-container {
+            padding: 15px;
+        }
+        .terminal {
+            background-color: #000;
+            color: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            height: 500px;
+            overflow-y: auto;
+        }
+        .terminal-input {
+            margin-top: 15px;
+        }
+        .connection-form {
+            margin-bottom: 15px;
+        }
+    </style>
 </head>
 <body>
+<div class="layuimini-container layuimini-page-anim">
+    <div class="layuimini-main">
+        <fieldset class="table-search-fieldset">
+            <legend>终端控制</legend>
+            <div style="margin: 10px 10px 10px 10px">
+                <form class="layui-form layui-form-pane connection-form" action="">
+                    <div class="layui-form-item">
+                        <div class="layui-inline">
+                            <label class="layui-form-label">服务器:</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="host" id="host" autocomplete="off" class="layui-input" placeholder="输入服务器地址" value="localhost">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label">端口:</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="port" id="port" autocomplete="off" class="layui-input" placeholder="端口" value="22">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label">用户名:</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="username" id="username" autocomplete="off" class="layui-input" placeholder="用户名" value="root">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label">密码:</label>
+                            <div class="layui-input-inline">
+                                <input type="password" name="password" id="password" autocomplete="off" class="layui-input" placeholder="密码">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <button type="button" class="layui-btn" id="connect-btn">连接</button>
+                            <button type="button" class="layui-btn layui-btn-danger" id="disconnect-btn" style="display:none;">断开</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </fieldset>
 
+        <div class="terminal-container">
+            <div class="terminal" id="terminal-output"></div>
+            <input type="text" class="layui-input terminal-input" id="terminal-input" placeholder="输入命令..." disabled>
+        </div>
+    </div>
+</div>
+
+<script src="/layui/layui.js" charset="utf-8"></script>
+<script src="/static/js/nterm.js"></script>
+<script>
+    layui.use(['form', 'jquery'], function(){
+        var $ = layui.jquery;
+
+        // 初始化WebSocket连接
+        window.terminalWebSocket = null;
+
+        // 连接按钮事件
+        $('#connect-btn').on('click', function(){
+            const host = $('#host').val();
+            const port = $('#port').val();
+            const username = $('#username').val();
+            const password = $('#password').val();
+
+            if (!host || !port || !username) {
+                layer.msg('请填写完整的连接信息');
+                return;
+            }
+
+            // 创建连接信息对象
+            const connectInfo = {
+                host: host,
+                port: parseInt(port),
+                username: username,
+                password: password
+            };
+
+            // 初始化WebSocket连接
+            initWebSocket(connectInfo);
+        });
+
+        // 断开连接按钮事件
+        $('#disconnect-btn').on('click', function(){
+            if (window.terminalWebSocket) {
+                window.terminalWebSocket.close();
+            }
+        });
+
+        function initWebSocket(connectInfo) {
+            if (window.terminalWebSocket) {
+                window.terminalWebSocket.close();
+            }
+
+            const ws = new WebSocket('ws://' + window.location.host + '/ssh-terminal');
+            window.terminalWebSocket = ws;
+
+            ws.onopen = function(event) {
+                appendToTerminal('正在连接到 ' + connectInfo.host + '...\n');
+
+                // 发送连接信息到后端
+                ws.send(JSON.stringify(connectInfo));
+
+                $('#connect-btn').hide();
+                $('#disconnect-btn').show();
+                $('#terminal-input').prop('disabled', false);
+            };
+
+            ws.onmessage = function(event) {
+                appendToTerminal(event.data);
+            };
+
+            ws.onclose = function(event) {
+                appendToTerminal('连接已断开。\n');
+                $('#connect-btn').show();
+                $('#disconnect-btn').hide();
+                $('#terminal-input').prop('disabled', true);
+                window.terminalWebSocket = null;
+            };
+
+            ws.onerror = function(error) {
+                appendToTerminal('WebSocket错误: ' + error + '\n');
+            };
+        }
+
+        function appendToTerminal(text) {
+            const terminalOutput = document.getElementById('terminal-output');
+            terminalOutput.innerHTML += text;
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+    });
+</script>
 </body>
 </html>

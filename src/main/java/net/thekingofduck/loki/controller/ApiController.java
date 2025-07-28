@@ -172,7 +172,8 @@ public class ApiController {
                 new MenuChild("流量管理", "page/httplog.html", "fa fa-filter", "_self"),
                 new MenuChild("钓鱼管理", "page/fishing.html", "fa fa-anchor", "_self"),
                 new MenuChild("系统设置", "page/setting.html", "fa fa-gears", "_self"),
-                new MenuChild("终端", "page/nterm.html", "fa fa-gears", "_self")
+                new MenuChild("终端", "page/nterm.html", "fa fa-gears", "_self"),
+                new MenuChild("文件管理", "page/mfile.html", "fa fa-gears", "_self")
         );
         MenuInfo menuInfo = new MenuInfo("常规管理", "fa fa-address-book", "", "_self", childList);
         return new InitConfig(homeInfo, logoInfo, List.of(menuInfo));

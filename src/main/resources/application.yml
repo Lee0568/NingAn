@@ -44,8 +44,6 @@ mybatis:
 loki:
   adminPath: lokiadmin                  #后台路径 http://HOST:ADMINPORT/ADMINPPATH
   adminPort: 65535                      #后台端口 这个端口如果不在上面的端口列表里则后台无法访问
-  username: loki                        #后台路径 http://HOST:ADMINPORT/ADMINPPATH
-  password: loki@2333                   #后台路径 http://HOST:ADMINPORT/ADMINPPATH
   templates: /resources/templates/      #模板渲染的路径 在jar包同级目录
   statics: /resources/statics/          #模板静态资源(images,js,css)的路径 在jar包同级目录
 
