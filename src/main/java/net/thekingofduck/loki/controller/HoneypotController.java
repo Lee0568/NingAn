@@ -27,9 +27,9 @@ public class HoneypotController { // 建议重命名为 AdminController
     }
 
     // 命令执行内容片段
-    @GetMapping("/command_exec.html")
+    @GetMapping("/command.html")
     public String showCommandExecPage() {
-        return "admin/command_exec"; // 返回命令执行内容片段页面
+        return "admin/command"; // 返回命令执行内容片段页面
     }
 
     // SQL 查询内容片段

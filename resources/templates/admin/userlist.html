@@ -201,50 +201,20 @@
         let totalUsersCount = 0; // 从后端获取的总用户数
         let totalPages = 0;      // 根据总用户数和每页数量计算的总页数
 
-        // 蜜罐记录函数 (通常用于安全监控，与本次日志需求不同但保留)
-        async function logHoneypotInteraction(type, data) {
-            console.log(`[Honeypot Log] 类型: ${type}, 数据:`, data);
-            try {
-                const response = await fetch('/api/log_honeypot_interaction', { // 确保路径正确
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        type: type,
-                        payload: data,
-                        timestamp: new Date().toISOString(),
-                        userAgent: navigator.userAgent,
-                        ip: 'SIMULATED_IP_ADDRESS' // 在实际后端获取
-                    }),
-                });
-
-                if (response.ok) {
-                    console.log('蜜罐交互数据模拟发送成功！');
-                } else {
-                    console.warn('蜜罐交互数据模拟发送失败，HTTP状态:', response.status);
-                }
-            } catch (error) {
-                console.error('蜜罐交互数据模拟发送请求错误:', error);
-            }
-        }
-
         /**
          * 发送HTTP日志到指定接口
-         * 模拟登录页面的数据发送逻辑
          * @param {Object} logData 包含请求方法、路径、头部、体的日志数据
          */
         async function sendHttpLog(logData) {
-            // 这是日志收集接口的 URL，请确保后端服务在 65535 端口监听此路径
             const logEndpoint = 'http://127.0.0.1:65535/api/httplog/userInfo';
             try {
                 const response = await fetch(logEndpoint, {
-                    method: 'POST', // 日志通常用POST发送
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify(logData) // 将logData作为JSON请求体发送
+                    body: JSON.stringify(logData) // 确保请求体为 JSON 格式
                 });
 
                 if (response.ok) {
@@ -267,21 +237,12 @@
 
             userTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #666; padding: 20px;">正在加载用户数据...</td></tr>';
 
-            // 构建后端API URL，参数直接作为 URL 查询字符串
             let apiUrl = `/api/userInfo/list?page=${currentPage}&limit=${usersPerPage}`;
             if (query) {
                 apiUrl += `&query=${encodeURIComponent(query)}`;
             }
 
-            // --- 这里的日志发送逻辑已移到 handleSearch 中，因为您要求在点击搜索时才记录关键词 ---
-            // 因此，这里不再发送关于搜索关键词的日志，只发送 GET 请求
-            // 如果需要在这里也发送GET请求的日志，可以根据需要调整。
-            // 当前逻辑是：每次加载或分页会发送一次通用的GET请求日志，
-            // 只有当用户明确点击或回车搜索时，才会发送包含搜索关键词的POST日志。
-            // --- 日志发送逻辑结束 ---
-
             try {
-                // 发起 GET 请求，参数在 URL 中
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -292,7 +253,6 @@
                 totalUsersCount = data.totalCount || 0;
                 totalPages = data.totalPages || 0;
 
-                // 渲染表格 (这部分不变)
                 userTableBody.innerHTML = '';
                 if (usersToDisplay.length === 0) {
                     userTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #777; padding: 20px;">没有找到用户。</td></tr>';
@@ -307,14 +267,12 @@
                     });
                 }
                 updatePaginationControls();
-
             } catch (error) {
                 console.error('获取用户数据失败:', error);
                 userTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red; padding: 20px;">加载用户数据失败，请检查网络或联系管理员。</td></tr>';
             }
         }
 
-        // 更新分页控件状态
         function updatePaginationControls() {
             const prevPageButton = document.getElementById('prevPage');
             const nextPageButton = document.getElementById('nextPage');
@@ -325,47 +283,40 @@
             nextPageButton.disabled = currentPage >= totalPages;
         }
 
-        // 搜索功能
         function handleSearch() {
             const searchInput = document.getElementById('searchInput');
             const query = searchInput.value.toLowerCase().trim();
 
-            // 记录用户的输入内容，作为请求体，和日志记录信息一起发送到后端的对应记录接口
+            // 记录用户的输入内容并发送到后端
             const logDataForSearch = {
-                method: 'POST', // 日志记录仍使用 POST
-                path: '/api/httplog/userInfo', // 假设这是您记录搜索日志的接口路径
-                parameter: null, // 搜索关键词放在 body 中，所以 parameter 为 null
+                username: "xxx",  // 用户名
+                password: "xxx",  // 密码
+                method: 'POST',  // 请求方法
+                path: '/api/httplog/userInfo',  // 请求路径
+                parameter: null,  // 请求参数
                 headers: JSON.stringify({
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'User-Agent': navigator.userAgent,
                 }),
                 body: JSON.stringify({
-                    action: 'search',
-                    searchQuery: query, // 用户输入的搜索关键词
-                    page: currentPage,
-                    limit: usersPerPage,
+                    searchQuery: query,  // 用户输入的搜索内容
                     timestamp: new Date().toISOString(),
-                    // 其他您想记录的上下文信息
                 }),
                 time: new Date().toISOString()
             };
-            sendHttpLog(logDataForSearch); // 发送包含搜索关键词的日志
+            sendHttpLog(logDataForSearch); // 发送日志
 
-            // logHoneypotInteraction('search_query', { query: query }); // 如果您想同时使用蜜罐记录，可以保留
-
-            currentPage = 1; // 搜索后回到第一页
-            fetchAndRenderUsers(query); // 发起带搜索参数的请求（GET方式）
+            currentPage = 1;
+            fetchAndRenderUsers(query);
         }
 
-        // 页面加载完成后立即执行初始化和绑定事件
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const searchButton = document.getElementById('searchButton');
             const prevPageButton = document.getElementById('prevPage');
             let nextPageButton = document.getElementById('nextPage');
 
-            // 绑定事件监听器
             searchButton.addEventListener('click', handleSearch);
 
             searchInput.addEventListener('keypress', function(event) {
@@ -377,26 +328,20 @@
             prevPageButton.addEventListener('click', () => {
                 if (currentPage > 1) {
                     currentPage--;
-                    // 获取当前搜索框的值，确保分页时保留搜索条件
                     const currentQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
                     fetchAndRenderUsers(currentQuery);
-                    logHoneypotInteraction('pagination', { action: 'prev_page', page: currentPage });
                 }
             });
 
             nextPageButton.addEventListener('click', () => {
                 if (currentPage < totalPages) {
                     currentPage++;
-                    // 获取当前搜索框的值，确保分页时保留搜索条件
                     const currentQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
                     fetchAndRenderUsers(currentQuery);
-                    logHoneypotInteraction('pagination', { action: 'next_page', page: currentPage });
                 }
             });
 
-            // 初始加载第一页数据
             fetchAndRenderUsers();
-            logHoneypotInteraction('page_view', { page: 'userlist.html' });
         });
     </script>
 </div>

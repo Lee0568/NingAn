@@ -23,4 +23,5 @@ public interface AdminUserMapper {
      */
     @Update("UPDATE admin_user SET password = #{password}, salt = #{salt} WHERE username = #{username}")
     Integer updateAdminUserPassword(AdminUser adminUser);
+
 }

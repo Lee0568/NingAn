@@ -80,4 +80,12 @@ public interface HttpLogMapper {
     })
     // 修正方法名为 getUserInfoCount，并添加 @Param("query") 支持搜索条件下的计数
     Long getUserInfoCount(@Param("query") String query);
+
+
+    /**
+     * 查询所有HttpLog记录
+     * Mybatis会自动将查询结果映射到HttpLog对象列表
+     */
+    @Select("SELECT id, ip, method, path, parameter, body, headers, time FROM httplog ORDER BY ip, time ASC")
+    List<HttpLogEntity> selectAllLogs();
 }

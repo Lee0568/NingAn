@@ -26,8 +26,13 @@
           "href": "./page/nterm.html",
           "icon": "fa fa-gears",
           "target": "_self"
+        },
+        {
+          "title": "AI助手",
+          "href": "./page/AI.html",
+          "icon": "fa fa-gears",
+          "target": "_self"
         }
-
       ]
     }
   ]

@@ -19,6 +19,6 @@ public class HttpLogEntity {
     private String headers;
     private String body;
     private String time;
-    private String username;
-    private String password;
+    private String username = "xxx";
+    private String password = "xxx";
 }

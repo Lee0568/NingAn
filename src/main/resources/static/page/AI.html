@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柠安 AI 助手 - 网络安全智能问答</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1a2e; /* 深蓝背景 */
+            --text-color: #e0e0e0; /* 浅灰文字 */
+            --ai-bubble-color: #2a2a4a; /* AI气泡深色 */
+            --user-bubble-color: #0f3460; /* 用户气泡深蓝 */
+            --accent-color: #00bcd4; /* 青色强调 */
+            --secondary-accent-color: #8e44ad; /* 紫色次强调 */
+            --border-color: #3f3f5f; /* 边框色 */
+            --input-bg-color: #2c2c4d; /* 输入框背景 */
+            --scroll-thumb: #555577; /* 滚动条滑块 */
+            --scroll-track: #2a2a4a; /* 滚动条轨道 */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto Mono', monospace, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            overflow: hidden; /* 防止滚动条影响布局 */
+        }
+
+        .chat-container {
+            width: 98%;
+            height: 90vh; /* 稍微增加高度以填充页面 */
+            background-color: #21213e; /* 容器背景比body浅一些 */
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 2px solid var(--border-color);
+            margin: 0 auto; /* 如果仍然作为独立页面，保持水平居中 */
+            box-sizing: border-box; /* 确保 padding 和 border 包含在 width 内 */
+        }
+
+        .chat-header {
+            background-color: #1e1e3b;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* 调整为两端对齐 */
+            position: relative;
+        }
+
+        .chat-header h1 {
+            margin: 0;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8em;
+            color: var(--accent-color);
+            text-shadow: 0 0 8px rgba(0, 188, 212, 0.7);
+            flex-grow: 1; /* 标题占据可用空间 */
+            text-align: center; /* 标题居中 */
+        }
+
+        .ai-status {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            color: var(--secondary-accent-color);
+            font-size: 0.9em;
+        }
+
+        .ai-status .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #2ecc71; /* 绿色表示在线 */
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 5px #2ecc71;
+        }
+
+        /* 模式切换按钮样式 */
+        .mode-toggle {
+            position: absolute; /* 相对于 header 定位 */
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .mode-toggle label {
+            font-size: 0.9em;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+        .mode-toggle input[type="checkbox"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 40px;
+            height: 20px;
+            background-color: #555;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            outline: none;
+            transition: background-color 0.3s;
+        }
+        .mode-toggle input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background-color: #ccc;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .mode-toggle input[type="checkbox"]:checked {
+            background-color: var(--accent-color);
+        }
+        .mode-toggle input[type="checkbox"]:checked::before {
+            transform: translateX(20px);
+            background-color: #fff;
+        }
+        .mode-toggle .mode-text {
+            font-size: 0.9em;
+            color: var(--text-color);
+            min-width: 60px; /* 确保文本有足够空间 */
+            text-align: right; /* 让文字靠右对齐 */
+        }
+
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            scroll-behavior: smooth;
+        }
+
+        /* 自定义滚动条 */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: var(--scroll-track);
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background-color: var(--scroll-thumb);
+            border-radius: 4px;
+            border: 2px solid var(--scroll-track);
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background-color: #777799;
+        }
+
+        .message-bubble {
+            max-width: 75%; /* 保持气泡的最大宽度，防止过长 */
+            padding: 12px 18px;
+            border-radius: 18px;
+            line-height: 1.6;
+            word-wrap: break-word; /* 保证长单词换行 */
+        }
+
+        .user-message {
+            background-color: var(--user-bubble-color);
+            align-self: flex-end;
+            border-bottom-right-radius: 5px; /* 用户气泡右下角尖角 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .ai-message {
+            background-color: var(--ai-bubble-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 5px; /* AI气泡左下角尖角 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: flex-start;
+            color: var(--text-color); /* 确保AI回复颜色是浅色 */
+        }
+
+        .ai-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #fff;
+            margin-right: 10px;
+            flex-shrink: 0; /* 防止头像被压缩 */
+        }
+        .ai-avatar::before {
+            content: 'AI';
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7em;
+        }
+
+        .ai-message p {
+            margin: 0;
+            white-space: pre-wrap; /* 保留空白符和换行符 */
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            background-color: #1e1e3b;
+            gap: 10px;
+            align-items: center; /* 垂直居中对齐 */
+        }
+
+        .chat-input-area input[type="text"] {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 25px;
+            background-color: var(--input-bg-color);
+            color: var(--text-color);
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .chat-input-area input[type="text"]:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 8px rgba(0, 188, 212, 0.5);
+        }
+
+        /* 文件上传按钮样式 */
+        .file-upload-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            background-color: var(--secondary-accent-color); /* 使用次强调色 */
+            color: white;
+            padding: 12px 15px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            font-size: 0.9em;
+            font-family: 'Orbitron', sans-serif;
+            flex-shrink: 0; /* 防止被挤压 */
+        }
+        .file-upload-wrapper:hover {
+            background-color: #7b3ea0; /* 鼠标悬停时的颜色 */
+        }
+        .file-upload-wrapper input[type="file"] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-upload-wrapper .upload-icon {
+            margin-right: 5px;
+            /* 可以使用字体图标或SVG */
+        }
+
+        /* 文件上传成功后的标识 */
+        .file-upload-wrapper.uploaded {
+            background-color: #2ecc71; /* 绿色表示成功 */
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.4);
+        }
+        .file-upload-wrapper.uploaded .upload-icon {
+            /* content 属性只对 ::before/::after 伪元素有效，直接修改 span 的文本更直接 */
+            /* content: '✅'; */ /* 这行实际无效，会通过JS修改 */
+            margin-right: 5px;
+        }
+
+
+        .chat-input-area button {
+            padding: 12px 25px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 10px rgba(0, 188, 212, 0.4);
+            font-family: 'Orbitron', sans-serif;
+            flex-shrink: 0; /* 防止被挤压 */
+        }
+
+        .chat-input-area button:hover {
+            background-color: #00acc1;
+            transform: translateY(-2px);
+        }
+
+        .chat-input-area button:active {
+            transform: translateY(0);
+        }
+
+        .loading-dots {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            height: 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .loading-dots.show {
+            opacity: 1;
+        }
+
+        .loading-dots .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+        .loading-dots .dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .chat-container {
+                width: 98%;
+                height: 98vh;
+                border-radius: 10px;
+            }
+            .chat-header h1 {
+                font-size: 1.5em;
+            }
+            .chat-input-area {
+                flex-direction: column;
+                padding: 15px;
+            }
+            .chat-input-area input[type="text"] {
+                margin-bottom: 10px;
+            }
+            .chat-input-area button,
+            .file-upload-wrapper {
+                width: 100%;
+                margin-top: 10px;
+            }
+            .mode-toggle {
+                position: static; /* 在小屏幕上不固定定位 */
+                transform: none;
+                margin-bottom: 10px;
+                justify-content: center;
+                flex-direction: row; /* 在小屏幕上保持行排列 */
+            }
+            .chat-header {
+                flex-direction: column; /* 标题和模式切换垂直堆叠 */
+                gap: 10px;
+            }
+            .ai-status {
+                position: static;
+                transform: none;
+                margin-top: 10px;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="mode-toggle">
+            <span class="mode-text" id="current-mode-text">普通模式</span>
+            <input type="checkbox" id="mode-switch">
+            <label for="mode-switch">安全专家</label>
+        </div>
+        <h1>柠安 AI 助手</h1>
+        <div class="ai-status">
+            <span class="dot"></span>
+            <span>在线</span>
+        </div>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+        <div class="message-bubble ai-message">
+            <div class="ai-avatar"></div>
+            <p>您好！我是 柠安 AI 助手，专注于网络安全和智能问答。有什么可以帮助您的吗？</p>
+        </div>
+    </div>
+    <div class="chat-input-area">
+        <div class="file-upload-wrapper" id="file-upload-wrapper">
+            <span class="upload-icon" id="upload-icon">📄</span> <span id="file-upload-text">上传文件</span>
+            <input type="file" id="file-input" accept=".txt,.log,.conf,.ini,.py,.js,.java,.c,.cpp,.h,.go,.rb,.php,.html,.css,.md,.xml,.json,.yaml,.yml">
+        </div>
+        <input type="text" id="user-input" placeholder="请在这里输入您的问题..." autocomplete="off">
+        <button id="send-button">发送</button>    </div>
+</div>
+
+<script>
+    const chatMessages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
+    const fileInput = document.getElementById('file-input');
+    const modeSwitch = document.getElementById('mode-switch');
+    const currentModeText = document.getElementById('current-mode-text');
+    const fileUploadWrapper = document.getElementById('file-upload-wrapper');
+    const uploadIcon = document.getElementById('upload-icon');
+    const fileUploadText = document.getElementById('file-upload-text');
+    const API_URL = 'http://127.0.0.1:65535/api/v2/chat';
+
+    let isSending = false;
+    let currentMode = 'normal'; // 默认模式
+
+    // 定义两种模式的提示词
+    const PROMPT_NORMAL_MODE = "你是一个友好且乐于助人的AI助手，请用简洁易懂的语言回答问题。明白后你只需回答'yes'";
+    const PROMPT_SECURITY_EXPERT_MODE = "你是一名顶级的网络安全专家，精通漏洞分析、渗透测试、安全审计、攻防对抗。请以专业、严谨、准确的口吻回答问题，提供深入见解和可行解决方案，接下来你的回答需要简明扼要且迅速。明白后你只需回答'yes'";
+
+    // 滚动到底部
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // 添加消息到聊天界面
+    function addMessage(type, text) {
+        const messageBubble = document.createElement('div');
+        messageBubble.classList.add('message-bubble', `${type}-message`);
+
+        if (type === 'ai') {
+            const aiAvatar = document.createElement('div');
+            aiAvatar.classList.add('ai-avatar');
+            const textNode = document.createElement('p');
+            textNode.textContent = text;
+            messageBubble.appendChild(aiAvatar);
+            messageBubble.appendChild(textNode);
+        } else {
+            messageBubble.textContent = text;
+        }
+        chatMessages.appendChild(messageBubble);
+        scrollToBottom();
+    }
+
+    // 显示或隐藏加载动画
+    function toggleLoading(show) {
+        let loadingDots = document.getElementById('loading-dots');
+        if (!loadingDots) {
+            loadingDots = document.createElement('div');
+            loadingDots.id = 'loading-dots';
+            loadingDots.classList.add('loading-dots');
+            loadingDots.innerHTML = `
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                `;
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.classList.add('message-bubble', 'ai-message');
+            const aiAvatar = document.createElement('div');
+            aiAvatar.classList.add('ai-avatar');
+            aiMessageDiv.appendChild(aiAvatar);
+            aiMessageDiv.appendChild(loadingDots);
+            chatMessages.appendChild(aiMessageDiv);
+        }
+
+        if (show) {
+            loadingDots.classList.add('show');
+            scrollToBottom();
+        } else {
+            loadingDots.classList.remove('show');
+            if (loadingDots.parentNode && loadingDots.parentNode.classList.contains('ai-message')) {
+                loadingDots.parentNode.remove();
+            }
+        }
+    }
+
+    // 发送消息到后端的核心逻辑
+    async function sendToBackend(messageToSend, mode) {
+        isSending = true;
+        sendButton.disabled = true;
+        userInput.disabled = true;
+        fileInput.disabled = true; // 禁用文件输入
+
+        toggleLoading(true); // 显示加载动画
+
+        try {
+            const params = new URLSearchParams();
+            params.append('message', messageToSend);
+            params.append('mode', mode); // 传递当前模式给后端
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+                },
+                body: params.toString()
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API 请求失败: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+
+            const aiResponseContent = await response.text();
+            return aiResponseContent; // 返回后端回复
+        } catch (error) {
+            console.error('发送消息失败:', error);
+            throw error; // 重新抛出错误以便外部处理
+        } finally {
+            // 这里的 finally 不负责重置 isSending 等，因为外部还需要处理返回值
+            // 统一在外部的 sendMessage 或 modeSwitch 监听器中处理
+        }
+    }
+
+    // 统一处理用户输入和模式切换的消息发送
+    async function sendMessage(userMessage = null) {
+        if (isSending) return; // 避免重复发送
+
+        let message = userMessage;
+        let originalUserInput = userInput.value.trim(); // 保存原始用户输入
+
+        // 如果是用户点击发送按钮触发
+        if (userMessage === null) {
+            message = originalUserInput;
+            if (message === '' && fileInput.files.length === 0) {
+                return; // 没有文本也没有文件
+            }
+        }
+
+        let fileContent = '';
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            if (file.size > 1024 * 1024 * 5) { // 限制文件大小为5MB
+                addMessage('ai', '文件太大，请选择小于 5MB 的文件。');
+                fileInput.value = '';
+                // 移除上传成功标识
+                fileUploadWrapper.classList.remove('uploaded');
+                uploadIcon.textContent = '📄';
+                fileUploadText.textContent = '上传文件';
+                return;
+            }
+            try {
+                fileContent = await readFileContent(file);
+                // 仅在实际用户输入时显示上传文件信息
+                if (userMessage === null) {
+                    addMessage('user', `已上传文件: ${file.name}。文件内容将作为上下文的一部分发送。`);
+                }
+                message = `${message}\n文件内容:\n\`\`\`\n${fileContent}\n\`\`\``;
+            } catch (e) {
+                console.error('读取文件失败:', e);
+                addMessage('ai', '抱歉，读取文件内容失败。');
+                fileInput.value = '';
+                // 移除上传成功标识
+                fileUploadWrapper.classList.remove('uploaded');
+                uploadIcon.textContent = '📄';
+                fileUploadText.textContent = '上传文件';
+                return;
+            }
+        }
+
+        // 仅在用户输入时才显示用户消息气泡
+        if (userMessage === null && originalUserInput !== '') {
+            addMessage('user', originalUserInput);
+        }
+        userInput.value = ''; // 清空输入框
+        // 每次发送消息后清除文件输入，并重置上传按钮状态
+        fileInput.value = '';
+        fileUploadWrapper.classList.remove('uploaded');
+        uploadIcon.textContent = '📄';
+        fileUploadText.textContent = '上传文件';
+
+
+        // **核心改动：不再在这里添加模式提示词，只发送原始消息**
+        const messageToAI = message;
+
+        try {
+            const aiResponseContent = await sendToBackend(messageToAI, currentMode);
+            toggleLoading(false); // 隐藏加载动画
+            addMessage('ai', aiResponseContent); // 显示 AI 回复
+        } catch (error) {
+            // 错误已经在 sendToBackend 中打印，这里只显示用户友好的提示
+            toggleLoading(false); // 隐藏加载动画
+            addMessage('ai', `抱歉，Loki AI 助手暂时无法回复您的问题。错误：${error.message || '未知错误'}`);
+        } finally {
+            isSending = false;
+            sendButton.disabled = false;
+            userInput.disabled = false;
+            fileInput.disabled = false; // 重新启用文件输入
+            userInput.focus(); // 重新聚焦输入框
+        }
+    }
+
+
+    // 读取文件内容函数
+    function readFileContent(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsText(file, 'UTF-8'); // 假设文件内容为 UTF-8 文本
+        });
+    }
+
+    // 事件监听
+    sendButton.addEventListener('click', () => sendMessage(userInput.value.trim()));
+    userInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage(userInput.value.trim());
+        }
+    });
+
+    // 监听文件选择变化，显示文件已选择的标识
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            const fileName = fileInput.files[0].name;
+            fileUploadWrapper.classList.add('uploaded');
+            uploadIcon.textContent = '✅'; // 勾选图标
+            fileUploadText.textContent = `${fileName}`; // 显示文件名
+        } else {
+            fileUploadWrapper.classList.remove('uploaded');
+            uploadIcon.textContent = '📄';
+            fileUploadText.textContent = '上传文件';
+        }
+    });
+
+    // 模式切换监听
+    modeSwitch.addEventListener('change', async () => {
+        const previousMode = currentMode; // 记录切换前的模式
+
+        if (modeSwitch.checked) {
+            currentMode = 'expert';
+            currentModeText.textContent = '安全专家模式';
+            addMessage('ai', '正在切换模式，请稍后...'); // 立即显示提示
+
+            // 禁用输入，防止用户在切换期间发送消息
+            isSending = true;
+            sendButton.disabled = true;
+            userInput.disabled = true;
+            fileInput.disabled = true;
+
+            toggleLoading(true); // 显示加载动画
+
+            try {
+                // 自动发送专家模式提示词给后端
+                // 这里是唯一发送模式提示词的地方
+                await sendToBackend(PROMPT_SECURITY_EXPERT_MODE, currentMode);
+                toggleLoading(false); // 隐藏加载动画
+                addMessage('ai', '已切换至安全专家模式。'); // 后端返回结果后显示最终确认信息
+            } catch (error) {
+                console.error('切换到安全专家模式时发送提示词失败:', error);
+                toggleLoading(false);
+                addMessage('ai', `切换模式失败：${error.message || '未知错误'}`);
+                // 如果切换失败，回滚模式状态和UI
+                modeSwitch.checked = (previousMode === 'expert'); // 保持原状
+                currentMode = previousMode;
+                currentModeText.textContent = (previousMode === 'expert' ? '安全专家模式' : '普通模式');
+            } finally {
+                isSending = false;
+                sendButton.disabled = false;
+                userInput.disabled = false;
+                fileInput.disabled = false;
+                userInput.focus();
+            }
+
+        } else {
+            // 切换回普通模式
+            currentMode = 'normal';
+            currentModeText.textContent = '普通模式';
+            addMessage('ai', '正在切换模式，请稍后...'); // 立即显示提示
+
+            // 禁用输入，防止用户在切换期间发送消息
+            isSending = true;
+            sendButton.disabled = true;
+            userInput.disabled = true;
+            fileInput.disabled = true;
+
+            toggleLoading(true); // 显示加载动画
+
+            try {
+                // 自动发送普通模式提示词给后端
+                // 这里是唯一发送模式提示词的地方
+                await sendToBackend(PROMPT_NORMAL_MODE, currentMode);
+                toggleLoading(false); // 隐藏加载动画
+                addMessage('ai', '已切换至普通模式。'); // 后端返回结果后显示最终确认信息
+            } catch (error) {
+                console.error('切换到普通模式时发送提示词失败:', error);
+                toggleLoading(false);
+                addMessage('ai', `切换模式失败：${error.message || '未知错误'}`);
+                // 如果切换失败，回滚模式状态和UI
+                modeSwitch.checked = (previousMode === 'expert'); // 保持原状
+                currentMode = previousMode;
+                currentModeText.textContent = (previousMode === 'expert' ? '安全专家模式' : '普通模式');
+            } finally {
+                isSending = false;
+                sendButton.disabled = false;
+                userInput.disabled = false;
+                fileInput.disabled = false;
+                userInput.focus();
+            }
+        }
+    });
+
+
+    // 页面加载后自动聚焦输入框
+    window.addEventListener('load', () => {
+        userInput.focus();
+    });
+</script>
+</body>
+</html>

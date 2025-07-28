@@ -1,5 +1,8 @@
 package net.thekingofduck.loki.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import net.thekingofduck.loki.entity.CommandEnity;
 import net.thekingofduck.loki.entity.HttpLogEntity;
 import net.thekingofduck.loki.entity.UserInfoEntity;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
@@ -19,10 +22,14 @@ import java.util.Map;
 @Service
 public class UserService {
 
+    // 模拟的当前路径，与前端保持一致，这里作为Service的成员变量
+    // 注意：如果是多用户并发访问，每个用户应该有独立的路径状态。
+    // 简单的蜜罐系统可能不需要精细的用户会话管理，但实际应用中需要考虑。
+
     @Autowired
     private HttpLogMapper httpLogMapper;
     @Autowired
-    private HttpLogMapper getUserInfo;
+    private HttpLogMapper getUserInfo; // 这个命名可能有点歧义，通常Mapper接口名会直接反映其功能
 
     /**
      * 插入HTTP日志
@@ -92,4 +99,46 @@ public class UserService {
     }
 
 
+    /**
+     * 蜜罐-按照接受到的命令返回对应结果
+     */
+    public CommandEnity executeCommand(String command) { // 返回类型改为 CommandEnity
+        CommandEnity result = new CommandEnity(); // 创建一个实体类实例
+        String response = "";
+
+        if (command == null || command.trim().isEmpty()) {
+            response = "Error: Command cannot be empty.";
+        } else {
+            String lowerCaseCommand = command.trim().toLowerCase();
+
+            switch (lowerCaseCommand) {
+                case "ls":
+                    response = "file1.txt\nfolder_a\nindex.html\nREADME.md";
+                    break;
+                case "whoami":
+                    response = "root";
+                    break;
+                case "pwd":
+                    response = "/var/www/html";
+                    break;
+                case "cat /etc/passwd":
+                    response = "root:x:0:0:root:/root:/bin/bash\nlokiuser:x:1000:1000:Loki User:/home/lokiuser:/bin/bash";
+                    break;
+                case "id":
+                    response = "uid=1000(lokiuser) gid=1000(lokiuser) groups=1000(lokiuser)";
+                    break;
+                case "help":
+                    response = "Available commands: ls, whoami, pwd, cat /etc/passwd, id, help, exit.";
+                    break;
+                case "exit":
+                    response = "Exiting shell. Goodbye!";
+                    break;
+                default:
+                    response = "Command not found: '" + command + "'\nTry 'help' for available commands.";
+                    break;
+            }
+        }
+        result.setCommand(response); // 将结果设置到 CommandEnity 的 'command' 字段
+        return result; // 返回 CommandEnity 对象
+    }
 }
