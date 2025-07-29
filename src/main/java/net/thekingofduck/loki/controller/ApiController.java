@@ -193,7 +193,7 @@ public class ApiController {
         List<MenuChild> childList = List.of(
                 new MenuChild("流量管理", "page/httplog.html", "fa fa-filter", "_self"),
                 new MenuChild("钓鱼管理", "page/fishing.html", "fa fa-anchor", "_self"),
-                new MenuChild("黑客画像", "page/hackImag.html", "fa fa-gears", "_self"),
+                new MenuChild("黑客画像", "page/hackImg.html", "fa fa-gears", "_self"),
                 new MenuChild("终端", "page/nterm.html", "fa fa-gears", "_self"),
                 new MenuChild("文件管理", "page/mfile.html", "fa fa-gears", "_self"),
                 new MenuChild("智能AI", "page/AI.html", "fa fa-gears", "_self")

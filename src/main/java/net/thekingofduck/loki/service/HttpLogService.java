@@ -34,8 +34,15 @@ public class HttpLogService {
         // SQL 注入模式
         attackPatterns.add(new AttackPattern(
                 "SQL注入",
-                "(?i)(union\\s+select|select\\s+.*\\s+from|information_schema|xp_cmdshell|declare\\s+@v|exec\\s+|sleep\\s*\\(|\\bwaitfor\\s+delay\\b|benchmark\\s*\\(|load_file\\s*\\(|outfile\\s*|dumpfile\\s*|utl_inaddr\\.get_host_name|utl_http\\.request|dbms_pipe\\.receive_message|from\\s+[a-z_]+\\s+where\\s+\\w+=\\w+|\\bOR\\s+\\d+=\\d+\\b|\\bAND\\s+\\d+=\\d+\\b|'\\s*OR\\s+'\\d+'='\\d+)",
-                Arrays.asList("select", "union", "or", "and", "from", "where", "information_schema", "exec")
+                "(?i)(union\\s+select|select\\s+.*\\s+from|information_schema|xp_cmdshell|declare\\s+@v|exec\\s+|sleep\\s*\\(|\\bwaitfor\\s+delay\\b|benchmark\\s*\\(|load_file\\s*\\(|outfile\\s*|dumpfile\\s*|utl_inaddr\\.get_host_name|utl_http\\.request|dbms_pipe\\.receive_message|from\\s+[a-z_]+\\s+where\\s+\\w+=\\w+|\\b(?:OR|AND|XOR)\\b\\s*['\"\\d]+\\s*[=><!]\\s*['\"\\d]+|['\"]\\s*(?:OR|AND|XOR)\\s*['\"]?[a-z0-9_.]*['\"]?\\s*[=><!]\\s*['\"]?[a-z0-9_.]*['\"]?|\\b(OR|AND)\\s*\\d+=\\d+\\b|\\b(OR|AND)\\s*\\w+=\\w+\\b|--|#|\\/\\*|;|\\b(insert|update|delete)\\b.*\\bwhere\\b|convert\\s*\\(|cast\\s*\\(|ascii\\s*\\(|substring\\s*\\(|mid\\s*\\(|len\\s*\\(|length\\s*\\(|char\\s*\\(|concat\\s*\\(|schema_name\\s*|table_name\\s*|column_name\\s*)",
+                Arrays.asList(
+                        "select", "union", "or", "and", "from", "where",
+                        "information_schema", "exec", "xp_cmdshell", "sleep",
+                        "waitfor", "benchmark", "load_file", "outfile", "dumpfile",
+                        "insert", "update", "delete", "convert", "cast", "ascii",
+                        "substring", "mid", "len", "length", "char", "concat",
+                        "schema_name", "table_name", "column_name"
+                )
         ));
 
         // XSS 攻击模式
@@ -45,29 +52,32 @@ public class HttpLogService {
                 Arrays.asList("script", "alert", "javascript", "onerror", "onload", "confirm", "prompt")
         ));
 
-        // 命令执行/代码执行模式 (这里只列举常见部分，实际生产环境需更全面)
+        // 命令执行/代码执行模式 (已添加Linux常见命令)
         attackPatterns.add(new AttackPattern(
                 "命令执行",
-                "(?i)(exec\\s*\\(|system\\s*\\(|shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|pcntl_exec\\s*\\(|`.*`|curl\\s+http|wget\\s+http|rm\\s+-rf|cat\\s+/etc/passwd|bash\\s+-c)",
-                Arrays.asList("exec", "system", "shell", "bash", "cat", "rm")
+                // 在现有基础上增加对常见Linux命令的匹配
+                "(?i)(exec\\s*\\(|system\\s*\\(|shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|pcntl_exec\\s*\\(|`.*`|curl\\s+http|wget\\s+http|rm\\s+-rf|cat\\s+/etc/passwd|bash\\s+-c|\\bcat\\b|\\bls\\b|\\bwhoami\\b|\\bid\\b|\\bip\\s+a\\b|\\bnetstat\\b|\\bps\\b|\\bwget\\b|\\bcurl\\b|\\bpython\\b|\\bperl\\b|\\bphp\\b|\\bsh\\b|\\bbash\\b|\\bzsh\\b|\\bawk\\b|\\bfind\\b|\\bgrep\\b|\\bchmod\\b|\\bchown\\b|\\bmkdir\\b|\\brmdir\\b|\\bmv\\b|\\bcp\\b|\\becho\\b|\\bprintf\\b)",
+                Arrays.asList(
+                        "exec", "system", "shell", "bash", "cat", "rm",
+                        "ls", "whoami", "id", "ip", "netstat", "ps", "wget", "curl",
+                        "python", "perl", "php", "sh", "awk", "find", "grep",
+                        "chmod", "chown", "mkdir", "rmdir", "mv", "cp", "echo", "printf"
+                )
         ));
 
         // 文件包含模式 (本地/远程)
         attackPatterns.add(new AttackPattern(
                 "文件包含",
-                "(?i)(/etc/passwd|/proc/self/environ|\\.\\./\\.\\./|php://filter|php://input|data://|file://)",
-                Arrays.asList("php://", "file://", "/etc/passwd")
+                "(?i)(php:\\/\\/filter|file:\\/\\/|data:\\/\\/|phar:\\/\\/|zip:\\/\\/|compress\\.zlib:\\/\\/|glob:\\/\\/|\\/etc\\/passwd|\\/proc\\/self\\/environ|\\.\\.\\/|%2e%2e%2f|%252e%252e%252f)",
+                Arrays.asList("php://", "file://", "/etc/passwd", "../")
         ));
 
         // SSRF (Server-Side Request Forgery)
         attackPatterns.add(new AttackPattern(
                 "SSRF",
-                "(?i)(file://|gopher://|dict://|ftp://|http[s]?://(localhost|127\\.0\\.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+))",
+                "(?i)(file:\\/\\/|gopher:\\/\\/|dict:\\/\\/|ftp:\\/\\/|http[s]?:\\/\\/(localhost|127\\.0\\.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+))",
                 Arrays.asList("file://", "gopher://", "dict://")
         ));
-        // 其他可能的模式...
-        // attackPatterns.add(new AttackPattern("目录遍历", "(?i)(\\.\\./|%2e%2e%2f)", Arrays.asList("../")));
-        // attackPatterns.add(new AttackPattern("XPath注入", "(?i)(' or '1'='1|//user[starts-with(@name,'a')]", Arrays.asList("or", "starts-with")));
     }
 
     /**
@@ -124,10 +134,9 @@ public class HttpLogService {
 
                     // 如果关键词匹配成功，或没有关键词（直接走正则），则进行正则表达式匹配
                     if (keywordFound || pattern.getKeywords().isEmpty()) {
-                        if (pattern.getRegex().matcher(body).find()) {
+                        if (pattern.matches(body)) {
                             detectedAttackTypes.add(pattern.getName());
                             // 匹配到一个攻击类型即可，因为我们关心的是“是否检测到某种攻击”，而不是命中次数
-                            // 如果一个body同时命中多种模式，这里会都记录下来
                         }
                     }
                 }
@@ -154,9 +163,9 @@ public class HttpLogService {
         try {
             String jsonOutput = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(resultArray);
             // 将生成的 JSON 字符串打印到控制台
-            System.out.println("--- Generated JSON Output (for debugging) ---");
-            System.out.println(jsonOutput);
-            System.out.println("-------------------------------------------");
+//            System.out.println("--- Generated JSON Output (for debugging) ---");
+//            System.out.println(jsonOutput);
+//            System.out.println("-------------------------------------------");
             return jsonOutput;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             e.printStackTrace();

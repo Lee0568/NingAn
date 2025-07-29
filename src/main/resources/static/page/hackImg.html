@@ -1,10 +1,199 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黑客画像</title>
+    <style>
+        /* 页面整体布局 */
+        body {
+            font-family: 'Courier New', monospace; /* 模拟终端字体 */
+            background-color: #1a1a1a; /* 深色背景 */
+            color: #00ff00; /* 绿色文字，模拟终端效果 */
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden; /* 防止横向滚动条 */
+        }
+
+        header {
+            background-color: #000;
+            color: #00ff00;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 2px solid #00cc00; /* 绿色边框 */
+            box-shadow: 0 5px 15px rgba(0, 255, 0, 0.2);
+            font-size: 2em;
+            text-shadow: 0 0 10px #00ff00; /* 绿色发光效果 */
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 25px;
+            background-color: #2a2a2a; /* 更深的卡片背景 */
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3); /* 绿色发光阴影 */
+            border: 1px solid #00cc00; /* 绿色边框 */
+        }
+
+        .card {
+            display: flex;
+            align-items: center; /* 垂直居中对齐 */
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #3a3a3a; /* 卡片背景 */
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2); /* 卡片绿色发光阴影 */
+            border: 1px solid #009900; /* 卡片边框 */
+            transition: transform 0.2s ease-in-out; /* 鼠标悬停动画 */
+        }
+
+        .card:hover {
+            transform: translateY(-5px); /* 鼠标悬停上浮效果 */
+        }
+
+        .card-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .hacker-avatar {
+            width: 50px; /* 头像大小 */
+            height: 50px;
+            border-radius: 50%; /* 圆形头像 */
+            margin-right: 15px;
+            border: 2px solid #00ff00; /* 头像边框 */
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.5); /* 头像发光效果 */
+            background-color: #000; /* 默认背景，防止图片加载慢时的空白 */
+        }
+
+        .card .ip {
+            font-weight: bold;
+            font-size: 1.2em; /* IP字体大小 */
+            color: #00ffff; /* 青色，突出IP */
+            text-shadow: 0 0 5px #00ffff; /* IP发光 */
+        }
+
+        .attack-types {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* 攻击类型标签之间的间距 */
+            justify-content: flex-end; /* 标签靠右对齐 */
+        }
+
+        .attack-type {
+            background-color: #8800ff; /* 紫色背景 */
+            padding: 8px 15px;
+            border-radius: 20px; /* 圆角胶囊形状 */
+            color: white;
+            font-size: 0.9em;
+            text-transform: uppercase; /* 大写 */
+            letter-spacing: 0.5px; /* 字母间距 */
+            box-shadow: 0 0 5px rgba(136, 0, 255, 0.5); /* 紫色发光 */
+            border: 1px solid #6600cc;
+            white-space: nowrap; /* 防止换行 */
+        }
+
+        .attack-type-no-detection {
+            background-color: #555; /* 未检测到攻击的标签颜色 */
+            box-shadow: none;
+            border: 1px solid #777;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .card {
+                flex-direction: column;
+                align-items: flex-start; /* 小屏幕下左对齐 */
+            }
+
+            .card-left {
+                margin-bottom: 10px;
+            }
+
+            .attack-types {
+                justify-content: flex-start; /* 小屏幕下标签左对齐 */
+                width: 100%; /* 占据全部宽度 */
+            }
+        }
+    </style>
 </head>
 <body>
+<header>
+    <h1>黑客画像</h1>
+</header>
 
+<div class="container">
+    <div id="logs-container"></div>
+</div>
+
+<script>
+    // 获取黑客画像数据并渲染页面
+    async function fetchHackData() {
+        try {
+            const response = await fetch('http://127.0.0.1:65535/api/logs/analyze');
+            const data = await response.json();
+
+            // 获取容器元素
+            const logsContainer = document.getElementById('logs-container');
+            logsContainer.innerHTML = '';  // 清空现有内容
+
+            // 遍历数据并生成每个黑客的画像
+            data.forEach(hacker => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+
+                const cardLeft = document.createElement('div');
+                cardLeft.classList.add('card-left');
+
+                // 添加黑客头像
+                const avatar = document.createElement('img');
+                avatar.classList.add('hacker-avatar');
+                avatar.src = '/images/hacker.png'; // 直接指向您的静态资源路径
+                avatar.alt = 'Hacker Avatar';
+                cardLeft.appendChild(avatar);
+
+                const ip = document.createElement('div');
+                ip.classList.add('ip');
+                ip.textContent = `IP: ${hacker.ip}`;
+                cardLeft.appendChild(ip);
+
+                const attackTypes = document.createElement('div');
+                attackTypes.classList.add('attack-types');
+
+                // 检查是否有检测到攻击
+                if (hacker.attack_types && hacker.attack_types.length > 0 && hacker.attack_types[0] !== "未检测到攻击") {
+                    hacker.attack_types.forEach(type => {
+                        const attackType = document.createElement('div');
+                        attackType.classList.add('attack-type');
+                        attackType.textContent = type;
+                        attackTypes.appendChild(attackType);
+                    });
+                } else {
+                    const noDetection = document.createElement('div');
+                    noDetection.classList.add('attack-type', 'attack-type-no-detection');
+                    noDetection.textContent = "未检测到攻击";
+                    attackTypes.appendChild(noDetection);
+                }
+
+                card.appendChild(cardLeft);
+                card.appendChild(attackTypes);
+                logsContainer.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Error fetching hacker data:', error);
+            // 可以添加一个错误信息显示在页面上
+            const logsContainer = document.getElementById('logs-container');
+            logsContainer.innerHTML = '<p style="color: red; text-align: center;">无法加载数据，请检查服务是否运行或网络连接。</p>';
+        }
+    }
+
+    // 页面加载时自动请求数据
+    window.onload = fetchHackData;
+    // 每3秒刷新页面，而不是原来的3000毫秒（即3秒）
+    // 注意：3秒刷新对于频繁的日志来说可能过于频繁，根据实际需求调整
+    setInterval(fetchHackData, 5000);
+</script>
 </body>
 </html>

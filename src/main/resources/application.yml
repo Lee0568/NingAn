@@ -55,7 +55,7 @@ loki:
 # 这是添加 DeepSeek API 配置的推荐位置，作为一个独立的顶级配置项
 deepseek:
   api:
-    key: sk-a490ee65d02e4e48a0a5669716af1992                     # DeepSeek API 密钥
+    key: ${DEEPSEEK_API_KEY}                     # DeepSeek API 密钥，从环境变量中读取
     url: https://api.deepseek.com/v1/chat/completions # DeepSeek API URL
 
 templates:

@@ -27,10 +27,14 @@
             color: var(--text-color);
             min-height: 100vh;
             overflow: hidden; /* 防止滚动条影响布局 */
+            display: flex; /* 使用 Flexbox 确保 chat-container 垂直居中 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
         }
 
         .chat-container {
             width: 98%;
+            max-width: 900px; /* 增加最大宽度以提供更好的聊天体验 */
             height: 90vh; /* 稍微增加高度以填充页面 */
             background-color: #21213e; /* 容器背景比body浅一些 */
             border-radius: 15px;
@@ -163,6 +167,19 @@
             background-color: #777799;
         }
 
+        /* --- 修改开始 --- */
+        .message-row { /* 新增的父容器，用于控制左右对齐 */
+            display: flex;
+            width: 100%;
+            justify-content: flex-start; /* 默认左对齐 (AI消息) */
+        }
+
+        .user-message-row { /* 用户消息的父容器，靠右对齐 */
+            justify-content: flex-end;
+        }
+        /* --- 修改结束 --- */
+
+
         .message-bubble {
             max-width: 75%; /* 保持气泡的最大宽度，防止过长 */
             padding: 12px 18px;
@@ -173,14 +190,14 @@
 
         .user-message {
             background-color: var(--user-bubble-color);
-            align-self: flex-end;
+            /* align-self: flex-end; /* 这一行不再需要，因为父容器的 justify-content 负责对齐 */
             border-bottom-right-radius: 5px; /* 用户气泡右下角尖角 */
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
 
         .ai-message {
             background-color: var(--ai-bubble-color);
-            align-self: flex-start;
+            /* align-self: flex-start; /* 这一行不再需要 */
             border-bottom-left-radius: 5px; /* AI气泡左下角尖角 */
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             display: flex;
@@ -395,9 +412,10 @@
         </div>
     </div>
     <div class="chat-messages" id="chat-messages">
-        <div class="message-bubble ai-message">
+        <div class="message-row"> <div class="message-bubble ai-message">
             <div class="ai-avatar"></div>
             <p>您好！我是 柠安 AI 助手，专注于网络安全和智能问答。有什么可以帮助您的吗？</p>
+        </div>
         </div>
     </div>
     <div class="chat-input-area">
@@ -406,7 +424,8 @@
             <input type="file" id="file-input" accept=".txt,.log,.conf,.ini,.py,.js,.java,.c,.cpp,.h,.go,.rb,.php,.html,.css,.md,.xml,.json,.yaml,.yml">
         </div>
         <input type="text" id="user-input" placeholder="请在这里输入您的问题..." autocomplete="off">
-        <button id="send-button">发送</button>    </div>
+        <button id="send-button">发送</button>
+    </div>
 </div>
 
 <script>
@@ -435,6 +454,9 @@
 
     // 添加消息到聊天界面
     function addMessage(type, text) {
+        const messageRow = document.createElement('div'); // 新增的父容器
+        messageRow.classList.add('message-row');
+
         const messageBubble = document.createElement('div');
         messageBubble.classList.add('message-bubble', `${type}-message`);
 
@@ -445,10 +467,14 @@
             textNode.textContent = text;
             messageBubble.appendChild(aiAvatar);
             messageBubble.appendChild(textNode);
-        } else {
+            // AI 消息默认靠左，所以 messageRow 不需要额外的类
+        } else { // type === 'user'
             messageBubble.textContent = text;
+            messageRow.classList.add('user-message-row'); // 用户消息靠右
         }
-        chatMessages.appendChild(messageBubble);
+
+        messageRow.appendChild(messageBubble); // 将气泡添加到新的父容器中
+        chatMessages.appendChild(messageRow); // 将父容器添加到聊天区域
         scrollToBottom();
     }
 
@@ -464,13 +490,18 @@
                     <div class="dot"></div>
                     <div class="dot"></div>
                 `;
+            const aiMessageRow = document.createElement('div'); // 为加载动画也创建 row
+            aiMessageRow.classList.add('message-row');
+
             const aiMessageDiv = document.createElement('div');
             aiMessageDiv.classList.add('message-bubble', 'ai-message');
             const aiAvatar = document.createElement('div');
             aiAvatar.classList.add('ai-avatar');
             aiMessageDiv.appendChild(aiAvatar);
             aiMessageDiv.appendChild(loadingDots);
-            chatMessages.appendChild(aiMessageDiv);
+
+            aiMessageRow.appendChild(aiMessageDiv); // 将气泡（包含加载动画）添加到 row
+            chatMessages.appendChild(aiMessageRow); // 将 row 添加到聊天区域
         }
 
         if (show) {
@@ -478,8 +509,9 @@
             scrollToBottom();
         } else {
             loadingDots.classList.remove('show');
-            if (loadingDots.parentNode && loadingDots.parentNode.classList.contains('ai-message')) {
-                loadingDots.parentNode.remove();
+            // 移除加载动画的父容器
+            if (loadingDots.closest('.message-row')) {
+                loadingDots.closest('.message-row').remove();
             }
         }
     }
@@ -553,7 +585,8 @@
                 fileContent = await readFileContent(file);
                 // 仅在实际用户输入时显示上传文件信息
                 if (userMessage === null) {
-                    addMessage('user', `已上传文件: ${file.name}。文件内容将作为上下文的一部分发送。`);
+                    // addMessage('user', `已上传文件: ${file.name}。文件内容将作为上下文的一部分发送。`);
+                    // **这里不再额外添加上传文件信息，因为原始用户消息已经处理**
                 }
                 message = `${message}\n文件内容:\n\`\`\`\n${fileContent}\n\`\`\``;
             } catch (e) {
@@ -568,8 +601,8 @@
             }
         }
 
-        // 仅在用户输入时才显示用户消息气泡
-        if (userMessage === null && originalUserInput !== '') {
+        // 核心改动：无论是否发送文件，只要有原始用户输入就显示用户消息气泡
+        if (originalUserInput !== '') {
             addMessage('user', originalUserInput);
         }
         userInput.value = ''; // 清空输入框
