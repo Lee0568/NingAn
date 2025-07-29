@@ -24,6 +24,8 @@
             box-shadow: 0 5px 15px rgba(0, 255, 0, 0.2);
             font-size: 2em;
             text-shadow: 0 0 10px #00ff00; /* 绿色发光效果 */
+            position: relative; /* 确保 z-index 工作 */
+            z-index: 50; /* 比message-box低，但比普通内容高，防止其覆盖message-box */
         }
 
         .container {
@@ -47,7 +49,15 @@
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.2); /* 卡片绿色发光阴影 */
             border: 1px solid #009900; /* 卡片边框 */
             transition: transform 0.2s ease-in-out; /* 鼠标悬停动画 */
+            position: relative; /* 为弹出菜单定位 */
+            z-index: 1; /* 默认层级 */
         }
+
+        /* 确保当菜单弹出时，当前卡片在最上层，避免遮挡 */
+        .card.active-menu {
+            z-index: 2; /* 提高当前点击卡片的 z-index */
+        }
+
 
         .card:hover {
             transform: translateY(-5px); /* 鼠标悬停上浮效果 */
@@ -66,6 +76,7 @@
             border: 2px solid #00ff00; /* 头像边框 */
             box-shadow: 0 0 8px rgba(0, 255, 0, 0.5); /* 头像发光效果 */
             background-color: #000; /* 默认背景，防止图片加载慢时的空白 */
+            cursor: pointer; /* 添加手型光标表示可点击 */
         }
 
         .card .ip {
@@ -95,17 +106,96 @@
             white-space: nowrap; /* 防止换行 */
         }
 
-        .attack-type-no-detection {
-            background-color: #555; /* 未检测到攻击的标签颜色 */
-            box-shadow: none;
-            border: 1px solid #777;
+        /* 弹出操作菜单样式 */
+        .action-menu {
+            position: absolute;
+            top: calc(100% + 10px); /* 位于卡片下方 */
+            left: 20px; /* 与头像对齐 */
+            background-color: #4a4a4a;
+            border: 1px solid #00cc00;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 255, 0, 0.3);
+            z-index: 10; /* 确保菜单高于其他内容 */
+            padding: 10px;
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            gap: 8px;
         }
+
+        .action-menu.active {
+            display: flex; /* 显示菜单 */
+        }
+
+        .action-menu button {
+            background-color: #007bff; /* 蓝色按钮 */
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-size: 0.9em;
+        }
+
+        .action-menu button:hover {
+            background-color: #0056b3;
+        }
+
+        .action-menu button.ban-btn {
+            background-color: #dc3545; /* 红色按钮 */
+        }
+
+        .action-menu button.ban-btn:hover {
+            background-color: #c82333;
+        }
+
+        /* 消息提示框 - 修正定位和层级 */
+        #message-box {
+            position: fixed; /* 保持固定定位，确保不随滚动条移动 */
+            top: 100px; /* 根据Header大致高度调整，确保在Header下方 */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #00cc00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+            z-index: 10000; /* 再次提高 z-index，比Header的z-index更高 */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-out, visibility 0s 0.5s;
+            font-size: 1.1em;
+            text-align: center;
+            min-width: 250px;
+        }
+        /* 消息框显示时的状态 */
+        #message-box.show {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.5s ease-in, visibility 0s;
+        }
+
+        /* 新增的特定消息类型样式 */
+        #message-box.ban-success {
+            background-color: rgba(220, 53, 69, 0.9); /* 红色，与封禁按钮同色 */
+            border-color: #ff0000;
+            color: white; /* 确保文字清晰 */
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+        }
+        #message-box.unban-success {
+            background-color: rgba(0, 123, 255, 0.9); /* 蓝色，与解封按钮同色 */
+            border-color: #007bff;
+            color: white; /* 确保文字清晰 */
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.8);
+        }
+
 
         /* 响应式设计 */
         @media (max-width: 768px) {
             .card {
                 flex-direction: column;
-                align-items: flex-start; /* 小屏幕下左对齐 */
+                align-items: flex-start;
             }
 
             .card-left {
@@ -113,8 +203,16 @@
             }
 
             .attack-types {
-                justify-content: flex-start; /* 小屏幕下标签左对齐 */
-                width: 100%; /* 占据全部宽度 */
+                justify-content: flex-start;
+                width: 100%;
+            }
+
+            #message-box {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                transform: translateX(0);
+                top: 80px; /* 移动端Header可能更小，调整top */
             }
         }
     </style>
@@ -124,22 +222,116 @@
     <h1>黑客画像</h1>
 </header>
 
+<div id="message-box"></div>
+
 <div class="container">
     <div id="logs-container"></div>
 </div>
 
+
 <script>
+    // 后端 API 基础路径
+    const API_BASE_URL = '/api/ip-bans';
+
+    // 获取消息提示框元素
+    const messageBox = document.getElementById('message-box');
+    let messageHideTimeout;
+
+    // 显示消息提示
+    function showMessage(message, type = 'info') {
+        clearTimeout(messageHideTimeout);
+
+        // 重置所有特定类型类，防止样式残留
+        messageBox.classList.remove('success', 'error', 'ban-success', 'unban-success');
+
+        messageBox.textContent = message;
+
+        // 根据类型设置额外样式
+        if (type === 'ban-success') {
+            messageBox.classList.add('ban-success');
+        } else if (type === 'unban-success') {
+            messageBox.classList.add('unban-success');
+        } else if (type === 'success') { // 通用成功，可以是绿色
+            messageBox.style.backgroundColor = 'rgba(0, 150, 0, 0.9)';
+            messageBox.style.borderColor = '#00ff00';
+            messageBox.style.color = '#00ff00';
+        } else if (type === 'error') {
+            messageBox.style.backgroundColor = 'rgba(150, 0, 0, 0.9)';
+            messageBox.style.borderColor = '#ff0000';
+            messageBox.style.color = '#ff0000';
+        } else { // 默认信息，可以是绿色或深色背景
+            messageBox.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+            messageBox.style.borderColor = '#00cc00';
+            messageBox.style.color = '#00ff00';
+        }
+
+        messageBox.classList.add('show');
+        messageBox.style.display = 'block'; // 确保元素在触发 transition 之前是显示的
+
+        messageHideTimeout = setTimeout(() => {
+            messageBox.classList.remove('show');
+            messageBox.addEventListener('transitionend', function handler() {
+                messageBox.removeEventListener('transitionend', handler);
+                messageBox.style.display = 'none';
+                // 动画结束后，清除特定样式类
+                messageBox.classList.remove('ban-success', 'unban-success');
+            }, { once: true });
+        }, 2500); // 2.5秒后开始淡出
+    }
+
+    // 处理 IP 封禁请求
+    async function handleIpAction(ip, actionType) {
+        try {
+            const url = `${API_BASE_URL}/${actionType}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `ip=${encodeURIComponent(ip)}`
+            });
+
+            if (response.ok) {
+                const result = await response.text();
+                // 根据 actionType 传递不同的 message 类型
+                if (actionType === 'ban') {
+                    showMessage(`操作成功: ${result}`, 'ban-success');
+                } else if (actionType === 'unban') {
+                    showMessage(`操作成功: ${result}`, 'unban-success');
+                } else {
+                    showMessage(`操作成功: ${result}`, 'success'); // 备用
+                }
+                fetchHackData();
+            } else {
+                const errorText = await response.text();
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    showMessage(`操作失败: ${errorJson.error || '未知错误'}`, 'error');
+                } catch (e) {
+                    showMessage(`操作失败: ${errorText}`, 'error');
+                }
+                console.error(`Error ${actionType} IP ${ip}:`, errorText);
+            }
+        } catch (error) {
+            showMessage(`网络错误或服务不可用: ${error.message}`, 'error');
+            console.error(`Network error for ${actionType} IP ${ip}:`, error);
+        } finally {
+            document.querySelectorAll('.action-menu.active').forEach(menu => {
+                menu.classList.remove('active');
+                menu.closest('.card').classList.remove('active-menu');
+            });
+        }
+    }
+
     // 获取黑客画像数据并渲染页面
     async function fetchHackData() {
         try {
             const response = await fetch('http://127.0.0.1:65535/api/logs/analyze');
             const data = await response.json();
 
-            // 获取容器元素
             const logsContainer = document.getElementById('logs-container');
-            logsContainer.innerHTML = '';  // 清空现有内容
+            logsContainer.innerHTML = '';
 
-            // 遍历数据并生成每个黑客的画像
             data.forEach(hacker => {
                 const card = document.createElement('div');
                 card.classList.add('card');
@@ -147,11 +339,45 @@
                 const cardLeft = document.createElement('div');
                 cardLeft.classList.add('card-left');
 
-                // 添加黑客头像
                 const avatar = document.createElement('img');
                 avatar.classList.add('hacker-avatar');
-                avatar.src = '/images/hacker.png'; // 直接指向您的静态资源路径
+                avatar.src = '/images/hacker.png';
                 avatar.alt = 'Hacker Avatar';
+                avatar.dataset.ip = hacker.ip;
+
+                avatar.addEventListener('click', (event) => {
+                    event.stopPropagation();
+
+                    document.querySelectorAll('.action-menu.active').forEach(menu => {
+                        menu.classList.remove('active');
+                        menu.closest('.card').classList.remove('active-menu');
+                    });
+
+                    card.classList.toggle('active-menu');
+
+                    const existingMenu = card.querySelector('.action-menu');
+                    if (existingMenu) {
+                        existingMenu.classList.toggle('active');
+                        return;
+                    }
+
+                    const actionMenu = document.createElement('div');
+                    actionMenu.classList.add('action-menu', 'active');
+
+                    const banButton = document.createElement('button');
+                    banButton.classList.add('ban-btn');
+                    banButton.textContent = '封禁 IP';
+                    banButton.onclick = () => handleIpAction(hacker.ip, 'ban');
+                    actionMenu.appendChild(banButton);
+
+                    const unbanButton = document.createElement('button');
+                    unbanButton.textContent = '解除封禁';
+                    unbanButton.onclick = () => handleIpAction(hacker.ip, 'unban');
+                    actionMenu.appendChild(unbanButton);
+
+                    card.appendChild(actionMenu);
+                });
+
                 cardLeft.appendChild(avatar);
 
                 const ip = document.createElement('div');
@@ -162,19 +388,13 @@
                 const attackTypes = document.createElement('div');
                 attackTypes.classList.add('attack-types');
 
-                // 检查是否有检测到攻击
-                if (hacker.attack_types && hacker.attack_types.length > 0 && hacker.attack_types[0] !== "未检测到攻击") {
+                if (hacker.attack_types && hacker.attack_types.length > 0) {
                     hacker.attack_types.forEach(type => {
                         const attackType = document.createElement('div');
                         attackType.classList.add('attack-type');
                         attackType.textContent = type;
                         attackTypes.appendChild(attackType);
                     });
-                } else {
-                    const noDetection = document.createElement('div');
-                    noDetection.classList.add('attack-type', 'attack-type-no-detection');
-                    noDetection.textContent = "未检测到攻击";
-                    attackTypes.appendChild(noDetection);
                 }
 
                 card.appendChild(cardLeft);
@@ -183,16 +403,18 @@
             });
         } catch (error) {
             console.error('Error fetching hacker data:', error);
-            // 可以添加一个错误信息显示在页面上
-            const logsContainer = document.getElementById('logs-container');
-            logsContainer.innerHTML = '<p style="color: red; text-align: center;">无法加载数据，请检查服务是否运行或网络连接。</p>';
+            showMessage('无法加载数据，请检查服务是否运行或网络连接。', 'error');
         }
     }
 
-    // 页面加载时自动请求数据
+    document.addEventListener('click', (event) => {
+        document.querySelectorAll('.action-menu.active').forEach(menu => {
+            menu.classList.remove('active');
+            menu.closest('.card').classList.remove('active-menu');
+        });
+    });
+
     window.onload = fetchHackData;
-    // 每3秒刷新页面，而不是原来的3000毫秒（即3秒）
-    // 注意：3秒刷新对于频繁的日志来说可能过于频繁，根据实际需求调整
     setInterval(fetchHackData, 5000);
 </script>
 </body>
