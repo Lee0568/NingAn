@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (terminalInput) {
         terminalInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
+                event.preventDefault(); // 防止表单提交
                 const command = terminalInput.value;
                 if (command && window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
                     // 显示用户输入的命令
@@ -20,3 +21,4 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+// 此文件已移除，所有逻辑已在nterm.html中实现

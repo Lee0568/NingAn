@@ -19,12 +19,19 @@
             font-family: monospace;
             height: 500px;
             overflow-y: auto;
+            white-space: pre-wrap;
+            outline: none;
+            cursor: text;
+            user-select: text;
         }
         .terminal-input {
             margin-top: 15px;
         }
         .connection-form {
             margin-bottom: 15px;
+        }
+        .prompt {
+            color: #0f0;
         }
     </style>
 </head>
@@ -70,20 +77,21 @@
         </fieldset>
 
         <div class="terminal-container">
-            <div class="terminal" id="terminal-output"></div>
-            <input type="text" class="layui-input terminal-input" id="terminal-input" placeholder="输入命令..." disabled>
+            <div class="terminal" id="terminal-output" tabindex="0"></div>
         </div>
     </div>
 </div>
 
 <script src="/layui/layui.js" charset="utf-8"></script>
-<script src="/static/js/nterm.js"></script>
 <script>
     layui.use(['form', 'jquery'], function(){
         var $ = layui.jquery;
 
         // 初始化WebSocket连接
         window.terminalWebSocket = null;
+        let currentPrompt = "root@loki:~# ";
+        let commandBuffer = "";
+        let isConnected = false;
 
         // 连接按钮事件
         $('#connect-btn').on('click', function(){
@@ -116,6 +124,105 @@
             }
         });
 
+        // 终端区域事件处理
+        const $terminal = $('#terminal-output');
+        
+        // 点击终端区域时聚焦
+        $terminal.on('click', function() {
+            $(this).focus();
+        });
+
+        // 处理粘贴事件
+        $terminal.on('paste', function(e) {
+            e.preventDefault();
+            if (!isConnected || !window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            let paste = (e.clipboardData || window.clipboardData).getData('text');
+            commandBuffer += paste;
+            updateCurrentLine();
+        });
+
+        // 终端键盘事件
+        $terminal.on('keydown', function(event) {
+            // 如果终端未连接，则不处理任何按键
+            if (!isConnected || !window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
+                // 允许F5刷新等系统快捷键
+                if (!(event.key === 'F5' || (event.ctrlKey && event.key === 'r'))) {
+                    event.preventDefault();
+                }
+                return;
+            }
+
+            // 处理回车键
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                
+                // 显示命令和换行
+                $terminal.append(commandBuffer + '\n');
+                scrollToBottom();
+                
+                // 发送命令到后端
+                window.terminalWebSocket.send(commandBuffer);
+                
+                // 清空命令缓冲区
+                commandBuffer = "";
+                return;
+            }
+
+            // 处理退格键
+            if (event.key === 'Backspace') {
+                event.preventDefault();
+                if (commandBuffer.length > 0) {
+                    // 删除最后一个字符
+                    commandBuffer = commandBuffer.slice(0, -1);
+                    updateCurrentLine();
+                }
+                return;
+            }
+
+            // 处理删除键
+            if (event.key === 'Delete') {
+                event.preventDefault();
+                return;
+            }
+
+            // 处理左/右箭头键
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
+                event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                return;
+            }
+
+            // 处理Tab键
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                commandBuffer += "    "; // 插入4个空格
+                updateCurrentLine();
+                return;
+            }
+
+            // 处理Home/End键
+            if (event.key === 'Home' || event.key === 'End') {
+                event.preventDefault();
+                return;
+            }
+
+            // 处理字符输入（只处理可见字符）
+            if (event.key.length === 1 && !event.ctrlKey && !event.altKey) {
+                event.preventDefault();
+                commandBuffer += event.key;
+                updateCurrentLine();
+                return;
+            }
+
+            // 阻止其他控制键的默认行为
+            if (!(event.key === 'F5' || (event.ctrlKey && event.key === 'r'))) {
+                event.preventDefault();
+            }
+        });
+
         function initWebSocket(connectInfo) {
             if (window.terminalWebSocket) {
                 window.terminalWebSocket.close();
@@ -125,37 +232,77 @@
             window.terminalWebSocket = ws;
 
             ws.onopen = function(event) {
-                appendToTerminal('正在连接到 ' + connectInfo.host + '...\n');
+                $terminal.empty(); // 清空终端
+                $terminal.append('正在连接到 ' + connectInfo.host + '...\n');
+                scrollToBottom();
 
                 // 发送连接信息到后端
                 ws.send(JSON.stringify(connectInfo));
 
                 $('#connect-btn').hide();
                 $('#disconnect-btn').show();
-                $('#terminal-input').prop('disabled', false);
+                isConnected = true;
+                
+                // 聚焦到终端区域
+                $terminal.focus();
+                
+                // 显示初始提示符
+                appendPrompt();
             };
 
             ws.onmessage = function(event) {
-                appendToTerminal(event.data);
+                $terminal.append(event.data);
+                scrollToBottom();
+                
+                // 如果收到的是换行结尾的内容，添加新提示符
+                if (event.data.endsWith('\n')) {
+                    appendPrompt();
+                }
             };
 
             ws.onclose = function(event) {
-                appendToTerminal('连接已断开。\n');
+                $terminal.append('\n连接已断开。\n');
+                scrollToBottom();
                 $('#connect-btn').show();
                 $('#disconnect-btn').hide();
-                $('#terminal-input').prop('disabled', true);
+                isConnected = false;
                 window.terminalWebSocket = null;
             };
 
             ws.onerror = function(error) {
-                appendToTerminal('WebSocket错误: ' + error + '\n');
+                $terminal.append('WebSocket错误: ' + error + '\n');
+                scrollToBottom();
             };
         }
 
-        function appendToTerminal(text) {
-            const terminalOutput = document.getElementById('terminal-output');
-            terminalOutput.innerHTML += text;
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        // 更新当前行显示
+        function updateCurrentLine() {
+            const content = $terminal.text();
+            const lines = content.split('\n');
+            
+            // 如果没有任何行，直接显示提示符
+            if (lines.length === 0) {
+                $terminal.text(currentPrompt + commandBuffer);
+                scrollToBottom();
+                return;
+            }
+            
+            // 更新最后一行（当前行）
+            lines[lines.length - 1] = currentPrompt + commandBuffer;
+            $terminal.text(lines.join('\n'));
+            scrollToBottom();
+        }
+
+        // 添加提示符
+        function appendPrompt() {
+            $terminal.append(currentPrompt);
+            commandBuffer = "";
+            scrollToBottom();
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            $terminal.scrollTop($terminal[0].scrollHeight);
         }
     });
 </script>

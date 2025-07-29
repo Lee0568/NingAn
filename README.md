@@ -6,6 +6,24 @@
 * Jul 14,2025 描述你的更改内容
 * Jul 27, 2025 蜜罐内容翻新，新建蜜罐数据库，路径识别逻辑优化
 * Jul 28, 2025 修改登录逻辑
+* Jul 29, 2025 稳步推进
+
+
+## 运行
+````
+version: '3.8'
+
+services:
+ning:
+image: guest121/ningan
+ports:
+- "8080:8080"
+- "8090:8090"
+- "65535:65535"
+environment:
+- SERVER_PORT=8080
+restart: unless-stopped
+ ````
 
 
 ### 待处理

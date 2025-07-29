@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  ning:
+    image: guest121/ningan
+    ports:
+      - "8080:8080"
+      - "8090:8090"
+      - "65535:65535"
+    environment:
+      - SERVER_PORT=8080
+    restart: unless-stopped
