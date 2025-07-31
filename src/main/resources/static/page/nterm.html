@@ -10,6 +10,8 @@
     <style>
         .terminal-container {
             padding: 15px;
+            display: flex;
+            flex-direction: row;
         }
         .terminal {
             background-color: #000;
@@ -23,9 +25,34 @@
             outline: none;
             cursor: text;
             user-select: text;
+            flex-grow: 1;
+            margin-right: 10px;
         }
-        .terminal-input {
-            margin-top: 15px;
+        .terminal:focus {
+            outline: 2px solid #00ff00;
+        }
+        .server-panel {
+            width: 25%;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            padding: 15px;
+            height: 500px;
+            overflow-y: auto;
+        }
+        .server-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        .server-item {
+            padding: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        .server-item:hover {
+            background-color: #e6e6e6;
         }
         .connection-form {
             margin-bottom: 15px;
@@ -41,57 +68,205 @@
         <fieldset class="table-search-fieldset">
             <legend>终端控制</legend>
             <div style="margin: 10px 10px 10px 10px">
-                <form class="layui-form layui-form-pane connection-form" action="">
-                    <div class="layui-form-item">
-                        <div class="layui-inline">
-                            <label class="layui-form-label">服务器:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="host" id="host" autocomplete="off" class="layui-input" placeholder="输入服务器地址" value="localhost">
-                            </div>
+                <div class="terminal-container">
+                    <div class="terminal" id="terminal-output" tabindex="0"></div>
+                    <div class="server-panel">
+                        <h3>服务器管理</h3>
+                        <!-- 添加切换按钮 -->
+                        <div class="layui-btn-container" style="margin-bottom: 15px;">
+                            <button type="button" class="layui-btn layui-btn-primary" id="show-add-form">添加服务器</button>
+                            <button type="button" class="layui-btn layui-btn-primary" id="show-server-list">服务器列表</button>
                         </div>
-                        <div class="layui-inline">
-                            <label class="layui-form-label">端口:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="port" id="port" autocomplete="off" class="layui-input" placeholder="端口" value="22">
-                            </div>
+                        
+                        <!-- 添加服务器表单 -->
+                        <div id="add-server-panel">
+                            <form class="layui-form layui-form-pane connection-form" action="">
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">服务器:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="host" id="host" autocomplete="off" class="layui-input" placeholder="输入服务器地址" value="localhost">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">端口:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="port" id="port" autocomplete="off" class="layui-input" placeholder="端口" value="22">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">用户名:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="username" id="username" autocomplete="off" class="layui-input" placeholder="用户名" value="root">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">密码:</label>
+                                    <div class="layui-input-block">
+                                        <input type="password" name="password" id="password" autocomplete="off" class="layui-input" placeholder="密码">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">备注:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="remark" id="remark" autocomplete="off" class="layui-input" placeholder="服务器备注">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <div class="layui-input-block">
+                                        <button type="button" class="layui-btn" id="connect-btn" lay-submit lay-filter="connect">连接</button>
+                                        <button type="button" class="layui-btn layui-btn-danger" id="disconnect-btn" style="display:none;">断开</button>
+                                        <button type="button" class="layui-btn layui-btn-normal" id="save-server-btn" lay-submit lay-filter="save-server">保存</button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
-                        <div class="layui-inline">
-                            <label class="layui-form-label">用户名:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="username" id="username" autocomplete="off" class="layui-input" placeholder="用户名" value="root">
+                        
+                        <!-- 服务器列表 -->
+                        <div id="server-list-panel" style="display: none;">
+                            <div class="server-list" id="server-list">
+                                <!-- 服务器列表将通过JavaScript动态填充 -->
                             </div>
-                        </div>
-                        <div class="layui-inline">
-                            <label class="layui-form-label">密码:</label>
-                            <div class="layui-input-inline">
-                                <input type="password" name="password" id="password" autocomplete="off" class="layui-input" placeholder="密码">
-                            </div>
-                        </div>
-                        <div class="layui-inline">
-                            <button type="button" class="layui-btn" id="connect-btn">连接</button>
-                            <button type="button" class="layui-btn layui-btn-danger" id="disconnect-btn" style="display:none;">断开</button>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
         </fieldset>
-
-        <div class="terminal-container">
-            <div class="terminal" id="terminal-output" tabindex="0"></div>
-        </div>
     </div>
 </div>
 
 <script src="/layui/layui.js" charset="utf-8"></script>
 <script>
-    layui.use(['form', 'jquery'], function(){
+    layui.use(['form', 'jquery', 'layer'], function(){
         var $ = layui.jquery;
+        var form = layui.form;
+        var layer = layui.layer;
 
         // 初始化WebSocket连接
         window.terminalWebSocket = null;
         let currentPrompt = "root@loki:~# ";
-        let commandBuffer = "";
         let isConnected = false;
+        // commandBuffer已移除，现在直接发送字符到SSH
+        let servers = []; // 服务器列表
+        let currentPanel = 'add'; // 当前面板，默认为添加服务器面板
+
+        // 切换到添加服务器面板
+        function showAddServerPanel() {
+            $('#add-server-panel').show();
+            $('#server-list-panel').hide();
+            $('#show-add-form').addClass('layui-btn-primary');
+            $('#show-server-list').removeClass('layui-btn-primary');
+            currentPanel = 'add';
+        }
+
+        // 切换到服务器列表面板
+        function showServerListPanel() {
+            $('#add-server-panel').hide();
+            $('#server-list-panel').show();
+            $('#show-add-form').removeClass('layui-btn-primary');
+            $('#show-server-list').addClass('layui-btn-primary');
+            currentPanel = 'list';
+            loadServers(); // 切换到列表面板时加载服务器列表
+        }
+
+        // 绑定切换按钮事件
+        $('#show-add-form').on('click', function() {
+            showAddServerPanel();
+        });
+
+        $('#show-server-list').on('click', function() {
+            showServerListPanel();
+        });
+
+        // 从后端加载服务器列表
+        function loadServers() {
+            $.get('/api/ssh/servers', function(res) {
+                if (res.code === 200) {
+                    servers = res.data;
+                    renderServerList();
+                } else {
+                    layer.msg('加载服务器列表失败: ' + res.message);
+                }
+            }).fail(function() {
+                layer.msg('加载服务器列表失败，请检查网络连接');
+            });
+        }
+
+        // 保存服务器列表到localStorage
+        function saveServers() {
+            localStorage.setItem('sshServers', JSON.stringify(servers));
+        }
+
+        // 渲染服务器列表
+        function renderServerList() {
+            const $serverList = $('#server-list');
+            $serverList.empty();
+            
+            if (servers.length === 0) {
+                $serverList.html('<p style="text-align: center; color: #999;">暂无服务器信息</p>');
+                return;
+            }
+            
+            servers.forEach((server, index) => {
+                const serverItem = $(`
+                    <div class="server-item" data-id="${server.id}" data-index="${index}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div><strong>${server.remark || server.host}</strong></div>
+                                <div>${server.host}:${server.port}</div>
+                                <div>用户: ${server.username}</div>
+                            </div>
+                            <div>
+                                <button class="layui-btn layui-btn-danger layui-btn-xs delete-server" data-id="${server.id}">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                $serverList.append(serverItem);
+            });
+            
+            // 绑定点击事件
+            $('.server-item').on('click', function() {
+                const index = $(this).data('index');
+                const server = servers[index];
+                showAddServerPanel(); // 切换到添加面板
+                $('#host').val(server.host);
+                $('#port').val(server.port);
+                $('#username').val(server.username);
+                $('#remark').val(server.remark || '');
+                // 注意：出于安全考虑，不显示密码
+            });
+            
+            // 绑定删除事件
+            $('.delete-server').on('click', function(event) {
+                event.stopPropagation(); // 阻止事件冒泡，避免触发server-item的点击事件
+                
+                const serverId = $(this).data('id');
+                const serverItem = servers.find(s => s.id === serverId);
+                
+                layer.confirm('确定要删除服务器 "' + (serverItem.remark || serverItem.host) + '" 吗？', {
+                    btn: ['确定','取消']
+                }, function(index){
+                    layer.close(index);
+                    
+                    // 发送删除请求
+                    $.ajax({
+                        url: '/api/ssh/server/' + serverId,
+                        type: 'DELETE',
+                        success: function(res) {
+                            if (res.code === 200) {
+                                layer.msg('删除成功');
+                                loadServers(); // 重新加载服务器列表
+                            } else {
+                                layer.msg('删除失败: ' + res.message);
+                            }
+                        },
+                        error: function() {
+                            layer.msg('删除失败，请检查网络连接');
+                        }
+                    });
+                });
+            });
+        }
 
         // 连接按钮事件
         $('#connect-btn').on('click', function(){
@@ -117,6 +292,111 @@
             initWebSocket(connectInfo);
         });
 
+        // 连接表单提交
+        form.on('submit(connect)', function(data) {
+            const host = $('#host').val();
+            const port = $('#port').val();
+            const username = $('#username').val();
+            const password = $('#password').val();
+
+            if (!host || !port || !username) {
+                layer.msg('请填写完整的连接信息');
+                return false;
+            }
+
+            // 创建连接信息对象
+            const connectInfo = {
+                host: host,
+                port: parseInt(port),
+                username: username,
+                password: password
+            };
+
+            // 初始化WebSocket连接
+            initWebSocket(connectInfo);
+            return false; // 阻止表单默认提交
+        });
+
+        // 保存表单提交
+        form.on('submit(save-server)', function(data) {
+            const host = $('#host').val();
+            const port = $('#port').val();
+            const username = $('#username').val();
+            const password = $('#password').val();
+            const remark = $('#remark').val();
+
+            if (!host || !port || !username || !password) {
+                layer.msg('请填写完整的服务器信息');
+                return false;
+            }
+
+            const serverInfo = {
+                host: host,
+                port: parseInt(port),
+                username: username,
+                password: password,
+                remark: remark
+            };
+
+            // 保存到后端
+            $.ajax({
+                url: '/api/ssh/server',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(serverInfo),
+                success: function(res) {
+                    if (res.code === 200) {
+                        layer.msg('服务器信息已保存');
+                        loadServers(); // 重新加载服务器列表
+                    } else if (res.code === 202) {
+                        // 服务器已存在，询问是否更新密码
+                        layer.confirm('服务器已存在，是否更新密码？', {
+                            btn: ['更新','取消']
+                        }, function(index){
+                            // 用户选择更新密码
+                            layer.close(index);
+                            
+                            // 更新服务器密码
+                            $.ajax({
+                                url: '/api/ssh/server',
+                                type: 'PUT',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    id: res.data.id,
+                                    host: host,
+                                    port: parseInt(port),
+                                    username: username,
+                                    password: password,
+                                    remark: remark || res.data.remark
+                                }),
+                                success: function(updateRes) {
+                                    if (updateRes.code === 200) {
+                                        layer.msg('密码更新成功');
+                                        loadServers(); // 重新加载服务器列表
+                                    } else {
+                                        layer.msg('更新失败: ' + updateRes.message);
+                                    }
+                                },
+                                error: function() {
+                                    layer.msg('更新失败，请检查网络连接');
+                                }
+                            });
+                        }, function(){
+                            // 用户选择取消
+                            layer.msg('取消更新');
+                        });
+                    } else {
+                        layer.msg('保存失败: ' + res.message);
+                    }
+                },
+                error: function() {
+                    layer.msg('保存失败，请检查网络连接');
+                }
+            });
+            
+            return false; // 阻止表单默认提交
+        });
+
         // 断开连接按钮事件
         $('#disconnect-btn').on('click', function(){
             if (window.terminalWebSocket) {
@@ -131,6 +411,11 @@
         $terminal.on('click', function() {
             $(this).focus();
         });
+        
+        // 页面加载完成后确保终端能正确获取焦点
+        $(document).ready(function() {
+            $terminal.attr('tabindex', '0').focus();
+        });
 
         // 处理粘贴事件
         $terminal.on('paste', function(e) {
@@ -140,14 +425,33 @@
             }
             
             let paste = (e.clipboardData || window.clipboardData).getData('text');
-            commandBuffer += paste;
-            updateCurrentLine();
+            // 直接发送粘贴内容到SSH
+            window.terminalWebSocket.send(paste);
         });
 
         // 终端键盘事件
         $terminal.on('keydown', function(event) {
+            console.log('键盘事件触发:', event.key, '连接状态:', isConnected);
+            
+            // 确保终端有焦点
+            if (!$(this).is(':focus')) {
+                $(this).focus();
+            }
+            
+            // 检查WebSocket状态，如果WebSocket不存在或未连接，重置连接状态
+            if (!window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
+                if (isConnected) {
+                    console.log('检测到WebSocket断开，重置连接状态');
+                    isConnected = false;
+                    $('#connect-btn').show();
+                    $('#disconnect-btn').hide();
+                }
+            }
+            
             // 如果终端未连接，则不处理任何按键
             if (!isConnected || !window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
+                console.log('终端未连接，忽略按键');
+                console.log('详细状态 - isConnected:', isConnected, 'WebSocket存在:', !!window.terminalWebSocket, 'WebSocket状态:', window.terminalWebSocket ? window.terminalWebSocket.readyState : 'undefined');
                 // 允许F5刷新等系统快捷键
                 if (!(event.key === 'F5' || (event.ctrlKey && event.key === 'r'))) {
                     event.preventDefault();
@@ -159,25 +463,19 @@
             if (event.key === 'Enter') {
                 event.preventDefault();
                 
-                // 显示命令和换行
-                $terminal.append(commandBuffer + '\n');
-                scrollToBottom();
-                
-                // 发送命令到后端
-                window.terminalWebSocket.send(commandBuffer);
-                
-                // 清空命令缓冲区
-                commandBuffer = "";
+                // 直接发送回车符到SSH
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\r');
+                }
                 return;
             }
 
             // 处理退格键
             if (event.key === 'Backspace') {
                 event.preventDefault();
-                if (commandBuffer.length > 0) {
-                    // 删除最后一个字符
-                    commandBuffer = commandBuffer.slice(0, -1);
-                    updateCurrentLine();
+                // 发送退格控制字符到SSH
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\b');
                 }
                 return;
             }
@@ -198,8 +496,10 @@
             // 处理Tab键
             if (event.key === 'Tab') {
                 event.preventDefault();
-                commandBuffer += "    "; // 插入4个空格
-                updateCurrentLine();
+                // 发送Tab字符到SSH
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\t');
+                }
                 return;
             }
 
@@ -212,8 +512,14 @@
             // 处理字符输入（只处理可见字符）
             if (event.key.length === 1 && !event.ctrlKey && !event.altKey) {
                 event.preventDefault();
-                commandBuffer += event.key;
-                updateCurrentLine();
+                console.log('发送字符到SSH:', event.key);
+                // 直接发送字符到SSH
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send(event.key);
+                    console.log('字符已发送');
+                } else {
+                    console.log('WebSocket未连接');
+                }
                 return;
             }
 
@@ -232,78 +538,69 @@
             window.terminalWebSocket = ws;
 
             ws.onopen = function(event) {
+                console.log('WebSocket连接已建立');
+                console.log('WebSocket readyState:', ws.readyState);
                 $terminal.empty(); // 清空终端
                 $terminal.append('正在连接到 ' + connectInfo.host + '...\n');
                 scrollToBottom();
 
                 // 发送连接信息到后端
                 ws.send(JSON.stringify(connectInfo));
+                console.log('连接信息已发送:', JSON.stringify(connectInfo));
 
                 $('#connect-btn').hide();
                 $('#disconnect-btn').show();
                 isConnected = true;
+                console.log('连接状态设置为true');
+                console.log('当前WebSocket readyState:', ws.readyState);
                 
                 // 聚焦到终端区域
                 $terminal.focus();
                 
-                // 显示初始提示符
-                appendPrompt();
+                // 确保终端能接收键盘事件
+                $terminal.attr('tabindex', '0');
+                $terminal.focus();
+                console.log('终端已聚焦');
             };
 
             ws.onmessage = function(event) {
+                // 直接添加SSH输出内容
                 $terminal.append(event.data);
                 scrollToBottom();
-                
-                // 如果收到的是换行结尾的内容，添加新提示符
-                if (event.data.endsWith('\n')) {
-                    appendPrompt();
-                }
             };
 
             ws.onclose = function(event) {
+                console.log('WebSocket连接关闭，事件:', event);
                 $terminal.append('\n连接已断开。\n');
                 scrollToBottom();
                 $('#connect-btn').show();
                 $('#disconnect-btn').hide();
                 isConnected = false;
                 window.terminalWebSocket = null;
+                console.log('连接状态已重置为false，WebSocket已清空');
             };
 
             ws.onerror = function(error) {
+                console.log('WebSocket错误:', error);
                 $terminal.append('WebSocket错误: ' + error + '\n');
                 scrollToBottom();
             };
         }
 
-        // 更新当前行显示
-        function updateCurrentLine() {
-            const content = $terminal.text();
-            const lines = content.split('\n');
-            
-            // 如果没有任何行，直接显示提示符
-            if (lines.length === 0) {
-                $terminal.text(currentPrompt + commandBuffer);
-                scrollToBottom();
-                return;
-            }
-            
-            // 更新最后一行（当前行）
-            lines[lines.length - 1] = currentPrompt + commandBuffer;
-            $terminal.text(lines.join('\n'));
-            scrollToBottom();
-        }
-
-        // 添加提示符
-        function appendPrompt() {
-            $terminal.append(currentPrompt);
-            commandBuffer = "";
-            scrollToBottom();
-        }
+        // 这些函数已不再需要，因为SSH输出直接显示
 
         // 滚动到底部
         function scrollToBottom() {
             $terminal.scrollTop($terminal[0].scrollHeight);
         }
+        
+        // 初始化加载服务器列表
+        loadServers();
+        
+        // 页面加载完成后确保终端能正确获取焦点
+        setTimeout(function() {
+            $terminal.attr('tabindex', '0').focus();
+        }, 100);
     });
 </script>
 </body>

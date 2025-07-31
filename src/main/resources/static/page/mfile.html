@@ -2,43 +2,118 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>服务器管理</title>
+    <title>文件管理</title>
     <meta name="renderer" content="webkit">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <link rel="stylesheet" href="/layui/css/layui.css" media="all">
     <style>
-        .server-container {
+        .file-container {
             padding: 15px;
+            display: flex;
+            flex-direction: row;
+            height: 600px;
         }
-        .server-form {
-            margin-bottom: 20px;
+        .file-browser {
+            background-color: #fff;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            padding: 15px;
+            flex-grow: 1;
+            margin-right: 10px;
+            overflow-y: auto;
+        }
+        .server-panel {
+            width: 25%;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-y: auto;
         }
         .server-list {
-            margin-top: 20px;
-        }
-        .terminal-container {
-            margin-top: 20px;
-            display: none;
-        }
-        .terminal {
-            background-color: #000;
-            color: #fff;
-            padding: 15px;
-            border-radius: 4px;
-            font-family: monospace;
-            height: 400px;
+            max-height: 200px;
             overflow-y: auto;
-            white-space: pre-wrap;
-            outline: none;
-            cursor: text;
-            user-select: text;
+            margin-bottom: 15px;
         }
-        .terminal-input {
-            margin-top: 15px;
+        .server-item {
+            padding: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            background-color: #fff;
+            cursor: pointer;
         }
-        .prompt {
-            color: #0f0;
+        .server-item:hover {
+            background-color: #e6e6e6;
+        }
+        .server-item.active {
+            background-color: #009688;
+            color: #fff;
+        }
+        .connection-form {
+            margin-bottom: 15px;
+        }
+        .file-list {
+            margin-top: 10px;
+        }
+        .file-item {
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .file-item:hover {
+            background-color: #f5f5f5;
+        }
+        .file-icon {
+            margin-right: 8px;
+            width: 16px;
+            text-align: center;
+        }
+        .file-name {
+            flex-grow: 1;
+        }
+        .file-size {
+            color: #999;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .file-time {
+            color: #999;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .breadcrumb {
+            padding: 10px 0;
+            border-bottom: 1px solid #e6e6e6;
+            margin-bottom: 10px;
+        }
+        .breadcrumb a {
+            color: #009688;
+            text-decoration: none;
+            margin-right: 5px;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .file-operations {
+            margin-bottom: 10px;
+        }
+        .connection-status {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .connection-status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .connection-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
     </style>
 </head>
@@ -46,184 +121,572 @@
 <div class="layuimini-container layuimini-page-anim">
     <div class="layuimini-main">
         <fieldset class="table-search-fieldset">
-            <legend>服务器管理</legend>
+            <legend>文件管理</legend>
             <div style="margin: 10px 10px 10px 10px">
-                <form class="layui-form layui-form-pane server-form" action="">
-                    <div class="layui-form-item">
-                        <div class="layui-inline">
-                            <label class="layui-form-label">名称:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="name" id="name" autocomplete="off" class="layui-input" placeholder="服务器名称">
-                            </div>
+                <div class="file-container">
+                    <div class="file-browser">
+                        <!-- 连接状态显示 -->
+                        <div class="connection-status disconnected" id="connection-status">
+                            未连接到服务器
                         </div>
-                        <div class="layui-inline">
-                            <label class="layui-form-label">主机:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="host" id="host" autocomplete="off" class="layui-input" placeholder="主机地址">
-                            </div>
+                        
+                        <!-- 文件操作按钮 -->
+                        <div class="file-operations" id="file-operations" style="display: none;">
+                            <button type="button" class="layui-btn layui-btn-sm" id="refresh-btn">
+                                <i class="layui-icon layui-icon-refresh"></i> 刷新
+                            </button>
+                            <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="upload-btn">
+                                <i class="layui-icon layui-icon-upload"></i> 上传
+                            </button>
+                            <button type="button" class="layui-btn layui-btn-sm layui-btn-warm" id="mkdir-btn">
+                                <i class="layui-icon layui-icon-add-1"></i> 新建文件夹
+                            </button>
+                            <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="disconnect-file-btn">
+                                <i class="layui-icon layui-icon-close"></i> 断开连接
+                            </button>
                         </div>
-                        <div class="layui-inline">
-                            <label class="layui-form-label">端口:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="port" id="port" autocomplete="off" class="layui-input" placeholder="端口" value="22">
+                        
+                        <!-- 路径导航 -->
+                        <div class="breadcrumb" id="breadcrumb" style="display: none;">
+                            <span>当前路径：</span>
+                            <a href="#" data-path="/">根目录</a>
+                        </div>
+                        
+                        <!-- 文件列表 -->
+                        <div class="file-list" id="file-list">
+                            <div style="text-align: center; color: #999; padding: 50px 0;">
+                                请先连接到服务器
                             </div>
                         </div>
                     </div>
-                    <div class="layui-form-item">
-                        <div class="layui-inline">
-                            <label class="layui-form-label">用户名:</label>
-                            <div class="layui-input-inline">
-                                <input type="text" name="username" id="username" autocomplete="off" class="layui-input" placeholder="用户名">
-                            </div>
+                    
+                    <div class="server-panel">
+                        <h3>服务器管理</h3>
+                        <!-- 添加切换按钮 -->
+                        <div class="layui-btn-container" style="margin-bottom: 15px;">
+                            <button type="button" class="layui-btn layui-btn-primary" id="show-add-form">添加服务器</button>
+                            <button type="button" class="layui-btn layui-btn-primary" id="show-server-list">服务器列表</button>
                         </div>
-                        <div class="layui-inline">
-                            <label class="layui-form-label">密码:</label>
-                            <div class="layui-input-inline">
-                                <input type="password" name="password" id="password" autocomplete="off" class="layui-input" placeholder="密码">
-                            </div>
+                        
+                        <!-- 添加服务器表单 -->
+                        <div id="add-server-panel">
+                            <form class="layui-form layui-form-pane connection-form" action="">
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">服务器:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="host" id="host" autocomplete="off" class="layui-input" placeholder="输入服务器地址" value="localhost">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">端口:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="port" id="port" autocomplete="off" class="layui-input" placeholder="端口" value="22">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">用户名:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="username" id="username" autocomplete="off" class="layui-input" placeholder="用户名" value="root">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">密码:</label>
+                                    <div class="layui-input-block">
+                                        <input type="password" name="password" id="password" autocomplete="off" class="layui-input" placeholder="密码">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <label class="layui-form-label">备注:</label>
+                                    <div class="layui-input-block">
+                                        <input type="text" name="remark" id="remark" autocomplete="off" class="layui-input" placeholder="服务器备注">
+                                    </div>
+                                </div>
+                                <div class="layui-form-item">
+                                    <div class="layui-input-block">
+                                        <button type="button" class="layui-btn" id="connect-btn" lay-submit lay-filter="connect">连接</button>
+                                        <button type="button" class="layui-btn layui-btn-normal" id="save-server-btn" lay-submit lay-filter="save-server">保存</button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
-                        <div class="layui-inline">
-                            <button type="button" class="layui-btn" id="add-server-btn">添加服务器</button>
+                        
+                        <!-- 服务器列表 -->
+                        <div id="server-list-panel" style="display: none;">
+                            <div class="server-list" id="server-list">
+                                <!-- 服务器列表将通过JavaScript动态填充 -->
+                            </div>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
         </fieldset>
-
-        <div class="server-container">
-            <table class="layui-table" id="server-table" lay-filter="serverTable"></table>
-        </div>
-
-        <div class="terminal-container" id="terminal-container">
-            <fieldset class="table-search-fieldset">
-                <legend>终端控制 - <span id="current-server"></span></legend>
-                <div style="margin: 10px 10px 10px 10px">
-                    <button type="button" class="layui-btn layui-btn-danger" id="disconnect-btn">断开连接</button>
-                </div>
-            </fieldset>
-            <div class="terminal" id="terminal-output" tabindex="0"></div>
-        </div>
     </div>
 </div>
 
-<!-- 表格操作列 -->
-<script type="text/html" id="serverOps">
-    <button class="layui-btn layui-btn-xs" lay-event="connect">连接</button>
-    <button class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">删除</button>
-</script>
-
 <script src="/layui/layui.js" charset="utf-8"></script>
 <script>
-    layui.use(['form', 'jquery', 'table'], function(){
+    layui.use(['form', 'jquery', 'layer', 'upload'], function(){
         var $ = layui.jquery;
         var form = layui.form;
-        var table = layui.table;
+        var layer = layui.layer;
+        var upload = layui.upload;
 
-        // 初始化WebSocket连接
-        window.terminalWebSocket = null;
-        let currentPrompt = "";
-        let commandBuffer = "";
+        // 全局变量
         let isConnected = false;
         let currentServer = null;
+        let currentPath = '/';
+        let servers = [];
+        let currentPanel = 'add';
 
-        // 初始化表格
-        table.render({
-            elem: '#server-table',
-            cols: [[
-                {field: 'name', title: '名称', width: 150},
-                {field: 'host', title: '主机', width: 150},
-                {field: 'port', title: '端口', width: 80},
-                {field: 'username', title: '用户名', width: 120},
-                {title: '操作', toolbar: '#serverOps', width: 150}
-            ]],
-            data: JSON.parse(localStorage.getItem('servers') || '[]'),
-            page: true
+        // 切换到添加服务器面板
+        function showAddServerPanel() {
+            $('#add-server-panel').show();
+            $('#server-list-panel').hide();
+            $('#show-add-form').addClass('layui-btn-primary');
+            $('#show-server-list').removeClass('layui-btn-primary');
+            currentPanel = 'add';
+        }
+
+        // 切换到服务器列表面板
+        function showServerListPanel() {
+            $('#add-server-panel').hide();
+            $('#server-list-panel').show();
+            $('#show-add-form').removeClass('layui-btn-primary');
+            $('#show-server-list').addClass('layui-btn-primary');
+            currentPanel = 'list';
+            loadServers();
+        }
+
+        // 绑定切换按钮事件
+        $('#show-add-form').on('click', function() {
+            showAddServerPanel();
         });
 
-        // 监听表格工具事件
-        table.on('tool(serverTable)', function(obj){
-            var data = obj.data;
-            if(obj.event === 'del'){
-                layer.confirm('确定删除该服务器吗？', function(index){
-                    // 从localStorage中删除服务器
-                    var servers = JSON.parse(localStorage.getItem('servers') || '[]');
-                    servers = servers.filter(function(server) {
-                        return server.id !== data.id;
-                    });
-                    localStorage.setItem('servers', JSON.stringify(servers));
-                    
-                    // 重新加载表格
-                    table.reload('server-table', {
-                        data: servers
-                    });
-                    
-                    layer.close(index);
-                });
-            } else if(obj.event === 'connect'){
-                connectToServer(data);
+        $('#show-server-list').on('click', function() {
+            showServerListPanel();
+        });
+
+        // 从后端加载服务器列表
+        function loadServers() {
+            $.get('/api/ssh/servers', function(res) {
+                if (res.code === 200) {
+                    servers = res.data;
+                    renderServerList();
+                } else {
+                    layer.msg('加载服务器列表失败: ' + res.message);
+                }
+            }).fail(function() {
+                layer.msg('加载服务器列表失败，请检查网络连接');
+            });
+        }
+
+        // 渲染服务器列表
+        function renderServerList() {
+            const $serverList = $('#server-list');
+            $serverList.empty();
+            
+            if (servers.length === 0) {
+                $serverList.html('<p style="text-align: center; color: #999;">暂无服务器信息</p>');
+                return;
             }
-        });
+            
+            servers.forEach((server, index) => {
+                const isActive = currentServer && currentServer.id === server.id;
+                const serverItem = $(`
+                    <div class="server-item ${isActive ? 'active' : ''}" data-id="${server.id}" data-index="${index}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div><strong>${server.remark || server.host}</strong></div>
+                                <div>${server.host}:${server.port}</div>
+                                <div>用户: ${server.username}</div>
+                            </div>
+                            <div>
+                                <button class="layui-btn layui-btn-xs connect-server" data-index="${index}">连接</button>
+                                <button class="layui-btn layui-btn-danger layui-btn-xs delete-server" data-id="${server.id}">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                $serverList.append(serverItem);
+            });
+            
+            // 绑定点击事件
+            $('.server-item').on('click', function() {
+                const index = $(this).data('index');
+                const server = servers[index];
+                showAddServerPanel();
+                $('#host').val(server.host);
+                $('#port').val(server.port);
+                $('#username').val(server.username);
+                $('#remark').val(server.remark || '');
+            });
+            
+            // 绑定连接事件
+            $('.connect-server').on('click', function(event) {
+                event.stopPropagation();
+                const index = $(this).data('index');
+                const server = servers[index];
+                connectToServer(server);
+            });
+            
+            // 绑定删除事件
+            $('.delete-server').on('click', function(event) {
+                event.stopPropagation();
+                
+                const serverId = $(this).data('id');
+                const serverItem = servers.find(s => s.id === serverId);
+                
+                layer.confirm('确定要删除服务器 "' + (serverItem.remark || serverItem.host) + '" 吗？', {
+                    btn: ['确定','取消']
+                }, function(index){
+                    layer.close(index);
+                    
+                    $.ajax({
+                        url: '/api/ssh/server/' + serverId,
+                        type: 'DELETE',
+                        success: function(res) {
+                            if (res.code === 200) {
+                                layer.msg('删除成功');
+                                loadServers();
+                            } else {
+                                layer.msg('删除失败: ' + res.message);
+                            }
+                        },
+                        error: function() {
+                            layer.msg('删除失败，请检查网络连接');
+                        }
+                    });
+                });
+            });
+        }
 
-        // 添加服务器按钮事件
-        $('#add-server-btn').on('click', function(){
-            var name = $('#name').val();
+        // 保存服务器表单提交事件
+        form.on('submit(save-server)', function(data){
             var host = $('#host').val();
             var port = $('#port').val();
             var username = $('#username').val();
             var password = $('#password').val();
-
-            if (!name || !host || !port || !username) {
+            var remark = $('#remark').val();
+            
+            if(!host || !port || !username || !password){
                 layer.msg('请填写完整的服务器信息');
-                return;
+                return false;
             }
-
-            // 创建服务器对象
+            
             var server = {
-                id: Date.now(), // 简单的ID生成方式
-                name: name,
+                host: host,
+                port: parseInt(port),
+                username: username,
+                password: password,
+                remark: remark
+            };
+            
+            // 发送到后端保存
+            $.ajax({
+                url: '/api/ssh/server',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(server),
+                success: function(res) {
+                    if (res.code === 200) {
+                        layer.msg('服务器保存成功');
+                        loadServers();
+                        
+                        // 清空表单
+                        $('#host').val('');
+                        $('#port').val('22');
+                        $('#username').val('');
+                        $('#password').val('');
+                        $('#remark').val('');
+                    } else {
+                        layer.msg('保存失败: ' + res.message);
+                    }
+                },
+                error: function() {
+                    layer.msg('保存失败，请检查网络连接');
+                }
+            });
+            
+            return false;
+        });
+
+        // 连接服务器表单提交事件
+        form.on('submit(connect)', function(data){
+            var host = $('#host').val();
+            var port = $('#port').val();
+            var username = $('#username').val();
+            var password = $('#password').val();
+            
+            if(!host || !port || !username || !password){
+                layer.msg('请填写完整的连接信息');
+                return false;
+            }
+            
+            var server = {
                 host: host,
                 port: parseInt(port),
                 username: username,
                 password: password
             };
-
-            // 保存到localStorage
-            var servers = JSON.parse(localStorage.getItem('servers') || '[]');
-            servers.push(server);
-            localStorage.setItem('servers', JSON.stringify(servers));
-
-            // 重新加载表格
-            table.reload('server-table', {
-                data: servers
-            });
-
-            // 清空表单
-            $('#name').val('');
-            $('#host').val('');
-            $('#port').val('22');
-            $('#username').val('');
-            $('#password').val('');
+            
+            connectToServer(server);
+            return false;
         });
 
         // 连接到服务器
         function connectToServer(server) {
             currentServer = server;
+            currentPath = '/';
             
-            // 显示终端容器
-            $('#terminal-container').show();
-            $('#current-server').text(server.name + ' (' + server.host + ')');
+            // 测试连接
+            $.ajax({
+                url: '/api/ssh/connect',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(server),
+                success: function(res) {
+                    if (res.code === 200) {
+                        isConnected = true;
+                        currentServer.id = res.data.serverId; // 保存服务器ID
+                        updateConnectionStatus(true, server);
+                        loadFileList(currentPath);
+                        updateFileOperationButtons();
+                        layer.msg('连接成功');
+                    } else {
+                        layer.msg('连接失败: ' + res.message);
+                    }
+                },
+                error: function() {
+                    layer.msg('连接失败，请检查网络连接');
+                }
+            });
+        }
+        
+        // 更新连接状态显示
+        function updateConnectionStatus(connected, server) {
+            const $status = $('#connection-status');
+            if (connected && server) {
+                $status.text(`已连接: ${server.remark || server.host}:${server.port}`)
+                       .removeClass('disconnected')
+                       .addClass('connected');
+                $('#file-operations').show();
+                $('#breadcrumb').show();
+            } else {
+                $status.text('未连接到服务器')
+                       .removeClass('connected')
+                       .addClass('disconnected');
+                $('#file-operations').hide();
+                $('#breadcrumb').hide();
+            }
+        }
+        
+        // 更新文件操作按钮状态
+        function updateFileOperationButtons() {
+            const buttons = ['#refresh-btn', '#upload-btn', '#mkdir-btn'];
+            buttons.forEach(btn => {
+                if (isConnected) {
+                    $(btn).removeClass('layui-btn-disabled');
+                } else {
+                    $(btn).addClass('layui-btn-disabled');
+                }
+            });
+        }
+        
+        // 加载文件列表
+        function loadFileList(path) {
+            if (!isConnected || !currentServer) {
+                return;
+            }
             
-            // 初始化WebSocket连接
-            initWebSocket(server);
+            $.ajax({
+                url: '/api/ssh/files',
+                type: 'GET',
+                data: {
+                    serverId: currentServer.id,
+                    path: path
+                },
+                success: function(res) {
+                    if (res.code === 200) {
+                        renderFileList(res.data);
+                        updateBreadcrumb(path);
+                        currentPath = path;
+                    } else {
+                        layer.msg('加载文件列表失败: ' + res.message);
+                    }
+                },
+                error: function() {
+                    layer.msg('加载文件列表失败，请检查网络连接');
+                }
+            });
+        }
+        
+        // 渲染文件列表
+        function renderFileList(files) {
+            const $fileList = $('#file-list');
+            $fileList.empty();
+            
+            if (files.length === 0) {
+                $fileList.html('<div style="text-align: center; color: #999; padding: 20px 0;">此目录为空</div>');
+                return;
+            }
+            
+            files.forEach(file => {
+                const isDir = file.type === 'directory';
+                const icon = isDir ? 'layui-icon-folder' : 'layui-icon-file';
+                const size = isDir ? '-' : formatFileSize(file.size);
+                
+                const fileItem = $(`
+                    <div class="file-item" data-path="${file.path}" data-type="${file.type}">
+                        <div class="file-icon">
+                            <i class="layui-icon ${icon}"></i>
+                        </div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${size}</div>
+                        <div class="file-time">${file.modifyTime}</div>
+                    </div>
+                `);
+                
+                $fileList.append(fileItem);
+            });
+            
+            // 绑定文件项点击事件
+            $('.file-item').on('click', function() {
+                const path = $(this).data('path');
+                const type = $(this).data('type');
+                
+                if (type === 'directory') {
+                    loadFileList(path);
+                } else {
+                    // 处理文件点击（可以添加下载或预览功能）
+                    layer.msg('文件: ' + path);
+                }
+            });
+        }
+        
+        // 更新面包屑导航
+        function updateBreadcrumb(path) {
+            const $breadcrumb = $('#breadcrumb');
+            $breadcrumb.empty();
+            
+            const parts = path.split('/').filter(p => p);
+            let currentPath = '';
+            
+            // 添加根目录
+            $breadcrumb.append('<span>当前路径：</span>');
+            $breadcrumb.append('<a href="#" data-path="/">根目录</a>');
+            
+            // 添加路径部分
+            parts.forEach(part => {
+                currentPath += '/' + part;
+                $breadcrumb.append(' / ');
+                $breadcrumb.append(`<a href="#" data-path="${currentPath}">${part}</a>`);
+            });
+            
+            // 绑定面包屑点击事件
+            $('#breadcrumb a').on('click', function(e) {
+                e.preventDefault();
+                const targetPath = $(this).data('path');
+                loadFileList(targetPath);
+            });
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // 断开连接按钮事件
-        $('#disconnect-btn').on('click', function(){
-            if (window.terminalWebSocket) {
-                window.terminalWebSocket.close();
+        // 文件操作按钮事件
+        $('#refresh-btn').on('click', function(){
+            if(isConnected){
+                loadFileList(currentPath);
+            } else {
+                layer.msg('请先连接服务器');
             }
-            $('#terminal-container').hide();
-            currentServer = null;
+        });
+        
+        $('#upload-btn').on('click', function(){
+            if(!isConnected){
+                layer.msg('请先连接服务器');
+                return;
+            }
+            
+            layer.open({
+                type: 1,
+                title: '上传文件',
+                content: '<div id="upload-area" style="padding: 20px; text-align: center; border: 2px dashed #ccc; margin: 10px;">点击或拖拽文件到此处上传</div>',
+                area: ['400px', '200px'],
+                success: function(layero, index){
+                    upload.render({
+                        elem: '#upload-area',
+                        url: '/api/ssh/upload',
+                        data: {
+                            serverId: currentServer.id,
+                            path: currentPath
+                        },
+                        done: function(res){
+                            if(res.code === 200){
+                                layer.msg('上传成功');
+                                layer.close(index);
+                                loadFileList(currentPath);
+                            } else {
+                                layer.msg('上传失败: ' + res.message);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        $('#mkdir-btn').on('click', function(){
+            if(!isConnected){
+                layer.msg('请先连接服务器');
+                return;
+            }
+            
+            layer.prompt({
+                title: '新建文件夹',
+                formType: 0
+            }, function(value, index){
+                if(value){
+                    $.ajax({
+                        url: '/api/ssh/mkdir',
+                        type: 'POST',
+                        data: {
+                            serverId: currentServer.id,
+                            path: currentPath,
+                            name: value
+                        },
+                        success: function(res){
+                            if(res.code === 200){
+                                layer.msg('创建成功');
+                                layer.close(index);
+                                loadFileList(currentPath);
+                            } else {
+                                layer.msg('创建失败: ' + res.message);
+                            }
+                        },
+                        error: function(){
+                            layer.msg('创建失败，请检查网络连接');
+                        }
+                    });
+                }
+            });
+        });
+        
+        $('#disconnect-file-btn').on('click', function(){
+            if(isConnected){
+                isConnected = false;
+                currentServer = null;
+                currentPath = '/';
+                updateConnectionStatus(false);
+                $('#file-list').html('<div style="text-align: center; color: #999; padding: 50px 0;">请先连接到服务器</div>');
+                updateFileOperationButtons();
+                layer.msg('已断开连接');
+            }
         });
 
         // 终端区域事件处理
@@ -410,6 +873,30 @@
         function scrollToBottom() {
             $terminal.scrollTop($terminal[0].scrollHeight);
         }
+        
+        // 页面初始化
+        $(document).ready(function() {
+            // 初始化连接状态
+            updateConnectionStatus(false);
+            updateFileOperationButtons();
+            
+            // 默认显示添加服务器面板
+            showAddServerPanel();
+            
+            // 加载服务器列表
+            loadServers();
+            
+            // 设置默认端口
+            $('#port').val('22');
+        });
+        
+        // 初始化完成后的处理
+        function initComplete() {
+            console.log('文件管理模块初始化完成');
+        }
+        
+        // 调用初始化
+        initComplete();
     });
 </script>
 </body>
