@@ -191,6 +191,7 @@ public class ApiController {
         HomeInfo homeInfo = new HomeInfo("首页", "./page/index.html");
         LogoInfo logoInfo = new LogoInfo("柠安", "images/logo.png", "");
         List<MenuChild> childList = List.of(
+                new MenuChild("可视化", "page/bigdata.html", "fa fa-filter", "_self"),
                 new MenuChild("流量管理", "page/httplog.html", "fa fa-filter", "_self"),
                 new MenuChild("钓鱼管理", "page/fishing.html", "fa fa-anchor", "_self"),
                 new MenuChild("黑客画像", "page/hackImg.html", "fa fa-gears", "_self"),

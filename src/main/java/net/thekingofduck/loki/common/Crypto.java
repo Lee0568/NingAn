@@ -61,7 +61,7 @@ public class Crypto {
      */
     public static String encrypt(String plainText, String key) throws Exception {
         SecretKey secKey = generateKey(key.getBytes());
-        Cipher cipher = Cipher.getInstance("AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secKey);
         // 使用标准Base64编码
         return Base64.getEncoder().encodeToString(cipher.doFinal(plainText.getBytes()));
@@ -77,7 +77,7 @@ public class Crypto {
         byte[] cipherBytes = new BASE64Decoder().decodeBuffer(cipherStr);
 
         SecretKey secKey = generateKey(key.getBytes());
-        Cipher cipher = Cipher.getInstance("AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, secKey);
 
         String plainText = new String(cipher.doFinal(cipherBytes), "UTF-8");
@@ -88,7 +88,7 @@ public class Crypto {
     public static String decrypt(String cipherStr, String key) throws Exception {
         byte[] cipherBytes = Base64.getDecoder().decode(cipherStr); // 使用标准Base64解码
         SecretKey secKey = generateKey(key.getBytes());
-        Cipher cipher = Cipher.getInstance("AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, secKey);
         return new String(cipher.doFinal(cipherBytes), "UTF-8");
     }

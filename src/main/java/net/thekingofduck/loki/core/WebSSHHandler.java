@@ -60,16 +60,7 @@ public class WebSSHHandler extends TextWebSocketHandler {
             channel = (ChannelShell) sshSession.openChannel("shell");
             channel.setPtyType("xterm");
 
-            channel.setOutputStream(new OutputStream() {
-                @Override
-                public void write(int b) {
-                }
-
-                @Override
-                public void write(byte[] b, int off, int len) throws IOException {
-                    ws.sendMessage(new TextMessage(Arrays.copyOfRange(b, off, off + len)));
-                }
-            });
+            // 不设置OutputStream，让SSH输出通过InputStream读取
 
             channel.connect();
 
@@ -87,8 +78,13 @@ public class WebSSHHandler extends TextWebSocketHandler {
 
         void transToSSH(String cmd) throws IOException {
             if (channel != null && channel.isConnected()) {
-                channel.getOutputStream().write(cmd.getBytes(StandardCharsets.UTF_8));
-                channel.getOutputStream().flush();
+                // 直接发送命令，不做任何修改
+                // 前端已经处理了回车键为\r，这里直接传输
+                OutputStream out = channel.getOutputStream();
+                out.write(cmd.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            } else {
+                throw new IOException("SSH channel is not connected");
             }
         }
 
