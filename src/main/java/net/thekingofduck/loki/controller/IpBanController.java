@@ -2,18 +2,19 @@ package net.thekingofduck.loki.controller;
 
 import net.thekingofduck.loki.service.IpBanService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders; // 导入 HttpHeaders
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType; // 导入 MediaType
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets; // 导入 StandardCharsets
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/ip-bans") // 建议为管理接口设置特定路径，并由拦截器排除
+@RequestMapping("/api/ip-bans")
+@CrossOrigin(origins = "http://127.0.0.1:8080") // 添加此注解以允许来自 8080 端口的跨域请求
 public class IpBanController {
 
     @Autowired
@@ -40,13 +41,13 @@ public class IpBanController {
     /**
      * 封禁指定的 IP 地址。
      *
-     * @param ip 要封禁的 IP 地址
+     * @param canvasId 要封禁的 IP 地址
      * @return 响应实体
      */
     @PostMapping("/ban")
-    public ResponseEntity<String> banIp(@RequestParam String ip) {
-        ipBanService.banIp(ip);
-        String message = "IP " + ip + " 已成功封禁.";
+    public ResponseEntity<String> banIp(@RequestParam String canvasId) {
+        ipBanService.banIp(canvasId);
+        String message = "IP " + canvasId + " 已成功封禁.";
 
         // 明确设置 Content-Type 为 text/plain;charset=UTF-8
         HttpHeaders headers = new HttpHeaders();
@@ -57,13 +58,13 @@ public class IpBanController {
     /**
      * 解封指定的 IP 地址。
      *
-     * @param ip 要解封的 IP 地址
+     * @param canvasId 要解封的 IP 地址
      * @return 响应实体
      */
     @PostMapping("/unban")
-    public ResponseEntity<String> unbanIp(@RequestParam String ip) {
-        ipBanService.unbanIp(ip);
-        String message = "IP " + ip + " 已成功解封.";
+    public ResponseEntity<String> unbanIp(@RequestParam String canvasId) {
+        ipBanService.unbanIp(canvasId);
+        String message = "IP " + canvasId + " 已成功解封.";
 
         // 明确设置 Content-Type 为 text/plain;charset=UTF-8
         HttpHeaders headers = new HttpHeaders();

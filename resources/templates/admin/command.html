@@ -90,6 +90,38 @@ Type 'help' for available commands.
     const API_URL = 'http://127.0.0.1:65535/api/v2/execute'; // 命令执行后端接口
     const LOG_API_URL = 'http://127.0.0.1:65535/api/httplog/userInfo'; // 日志记录后端接口
 
+    // ** 这是复用的 Canvas 指纹识别函数 **
+    async function getCanvasFingerprint() {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?';
+            ctx.textBaseline = 'top';
+            ctx.font = '14px "Arial"';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = '#f60';
+            ctx.fillRect(125, 1, 62, 20);
+            ctx.fillStyle = '#069';
+            ctx.fillText(text, 2, 15);
+            ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
+            ctx.fillText(text, 4, 17);
+
+            const dataUrl = canvas.toDataURL();
+            const encoder = new TextEncoder();
+            const data = encoder.encode(dataUrl);
+
+            window.crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                resolve(hashHex);
+            }).catch(error => {
+                console.error('Canvas 指纹哈希计算失败:', error);
+                resolve(null);
+            });
+        });
+    }
+
     // 模拟滚动到底部
     function scrollToBottom() {
         outputDiv.scrollTop = outputDiv.scrollHeight;
@@ -147,42 +179,48 @@ Type 'help' for available commands.
 
 
             if (command) {
-                // --- **发送日志记录请求 (满足指定格式)** ---
-                const currentDateTime = new Date().toISOString(); // 获取当前ISO格式时间
-                const userAgent = navigator.userAgent; // 获取浏览器User-Agent
-                const clientIp = '127.0.0.1'; // 前端无法直接获取真实客户端IP，这里用循环地址模拟，实际应由后端获取
+                // ** 新增：先获取 canvas 指纹，再发送日志 **
+                getCanvasFingerprint().then(fingerprint => {
+                    const currentDateTime = new Date().toISOString(); // 获取当前ISO格式时间
+                    const userAgent = navigator.userAgent; // 获取浏览器User-Agent
+                    const clientIp = '127.0.0.1'; // 前端无法直接获取真实客户端IP，这里用循环地址模拟
 
-                const logPayload = {
-                    method: 'POST', // 模拟为POST请求
-                    path: '/api/v2/execute', // 模拟被攻击的路径
-                    parameter: '', // 模拟没有URL参数
-                    // 嵌套的body字段，包含 command
-                    body: JSON.stringify({ command: command }),
-                    headers: JSON.stringify({
-                        'User-Agent': userAgent,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }),
-                    time: currentDateTime
-                    // 明确不发送 username 和 password 字段
-                };
+                    const logPayload = {
+                        canvasId: fingerprint, // ** 新增字段 **
+                        method: 'POST', // 模拟为POST请求
+                        path: '/api/v2/execute', // 模拟被攻击的路径
+                        parameter: '', // 模拟没有URL参数
+                        // 嵌套的body字段，包含 command
+                        body: JSON.stringify({
+                            command: command,
+                            canvasId: fingerprint // ** body 中也包含指纹 **
+                        }),
+                        headers: JSON.stringify({
+                            'User-Agent': userAgent,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }),
+                        time: currentDateTime
+                    };
 
-                fetch(LOG_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(logPayload) // 发送构建好的日志载荷
-                })
-                    .then(logResponse => {
-                        if (!logResponse.ok) {
-                            console.warn(`Warning: Failed to log command. Status: ${logResponse.status}`);
-                        }
+                    fetch(LOG_API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(logPayload) // 发送构建好的日志载荷
                     })
-                    .catch(logError => {
-                        console.error('Error sending log:', logError);
-                    });
-                // --- **日志记录请求结束** ---
+                        .then(logResponse => {
+                            if (!logResponse.ok) {
+                                console.warn(`Warning: Failed to log command. Status: ${logResponse.status}`);
+                            }
+                        })
+                        .catch(logError => {
+                            console.error('Error sending log:', logError);
+                        });
+                });
+                // ** 日志发送逻辑结束 **
+
 
                 // 发送POST请求到蜜罐命令执行后端
                 fetch(API_URL, {
@@ -194,21 +232,18 @@ Type 'help' for available commands.
                     body: JSON.stringify({ command: command }) // 将命令封装为JSON对象
                 })
                     .then(response => {
-                        // 检查响应是否成功
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
-                        return response.json(); // 解析JSON响应
+                        return response.json();
                     })
                     .then(data => {
-                        // 将后端返回的结果添加到输出区域
                         const responseContent = data && data.command ? data.command : "Error: No command result received or malformed response.";
                         outputDiv.innerHTML += `<pre>${responseContent}</pre>`;
                         scrollToBottom();
                         updateCursorPosition();
                     })
                     .catch(error => {
-                        // 处理请求错误
                         outputDiv.innerHTML += `<pre style="color: red;">Error: Could not connect to honeypot backend or an error occurred: ${error.message}</pre>`;
                         console.error('Fetch error:', error);
                         scrollToBottom();

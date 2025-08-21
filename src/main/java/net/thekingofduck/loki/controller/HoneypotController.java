@@ -37,4 +37,9 @@ public class HoneypotController { // 建议重命名为 AdminController
     public String showSqlQueryPage() {
         return "admin/sql_query"; // 返回 SQL 查询内容片段页面
     }
+    @GetMapping("/hackImg2.html")
+    public String showHackImg() {
+        return "admin/hackImg2.html"; // 返回 SQL 查询内容片段页面
+    }
+
 }

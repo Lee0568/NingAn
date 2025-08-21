@@ -202,6 +202,41 @@
         let totalPages = 0;      // 根据总用户数和每页数量计算的总页数
 
         /**
+         * 生成 Canvas 浏览器指纹哈希值
+         * @returns {Promise<string>} 返回一个 Promise，成功时解析为指纹哈希值（SHA-256）
+         */
+        async function getCanvasFingerprint() {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?';
+                ctx.textBaseline = 'top';
+                ctx.font = '14px "Arial"';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = '#f60';
+                ctx.fillRect(125, 1, 62, 20);
+                ctx.fillStyle = '#069';
+                ctx.fillText(text, 2, 15);
+                ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
+                ctx.fillText(text, 4, 17);
+
+                const dataUrl = canvas.toDataURL();
+                const encoder = new TextEncoder();
+                const data = encoder.encode(dataUrl);
+
+                window.crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    resolve(hashHex);
+                }).catch(error => {
+                    console.error('Canvas 指纹哈希计算失败:', error);
+                    resolve(null);
+                });
+            });
+        }
+
+        /**
          * 发送HTTP日志到指定接口
          * @param {Object} logData 包含请求方法、路径、头部、体的日志数据
          */
@@ -287,28 +322,33 @@
             const searchInput = document.getElementById('searchInput');
             const query = searchInput.value.toLowerCase().trim();
 
-            // 记录用户的输入内容并发送到后端
-            const logDataForSearch = {
-                username: "xxx",  // 用户名
-                password: "xxx",  // 密码
-                method: 'POST',  // 请求方法
-                path: '/api/httplog/userInfo',  // 请求路径
-                parameter: null,  // 请求参数
-                headers: JSON.stringify({
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'User-Agent': navigator.userAgent,
-                }),
-                body: JSON.stringify({
-                    searchQuery: query,  // 用户输入的搜索内容
-                    timestamp: new Date().toISOString(),
-                }),
-                time: new Date().toISOString()
-            };
-            sendHttpLog(logDataForSearch); // 发送日志
+            // 异步获取 canvas 指纹
+            getCanvasFingerprint().then(fingerprint => {
+                // 记录用户的输入内容和 canvas 指纹并发送到后端
+                const logDataForSearch = {
+                    canvasId: fingerprint, // 新增：canvas 指纹
+                    username: "xxx",  // 用户名
+                    password: "xxx",  // 密码
+                    method: 'POST',  // 请求方法
+                    path: '/api/httplog/userInfo',  // 请求路径
+                    parameter: null,  // 请求参数
+                    headers: JSON.stringify({
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'User-Agent': navigator.userAgent,
+                    }),
+                    body: JSON.stringify({
+                        searchQuery: query,  // 用户输入的搜索内容
+                        canvasId: fingerprint, // 新增：body 中也包含 canvas 指纹
+                        timestamp: new Date().toISOString(),
+                    }),
+                    time: new Date().toISOString()
+                };
+                sendHttpLog(logDataForSearch); // 发送日志
 
-            currentPage = 1;
-            fetchAndRenderUsers(query);
+                currentPage = 1;
+                fetchAndRenderUsers(query);
+            });
         }
 
         document.addEventListener('DOMContentLoaded', () => {

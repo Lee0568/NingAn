@@ -57,6 +57,24 @@ public class UserService {
             return 0; // 返回0表示插入失败
         }
     }
+    /**
+     * 往httplog表中插入canvasId
+     */
+    public Integer insertCanvasId(HttpLogEntity httpLogEntity){
+        if (httpLogEntity == null) {
+            return 0;
+        }
+        try {
+            // 调用Mapper接口，传入HttpLogEntity的各个属性
+            return httpLogMapper.updateCanvasId(
+                   httpLogEntity.getCanvasId()
+            );
+        } catch (Exception e) {
+            // 生产环境中应使用日志框架记录异常，例如 SLF4J + Logback
+            e.printStackTrace();
+            return 0; // 返回0表示插入失败
+        }
+    }
 
     /**
      * 获取表格员工信息

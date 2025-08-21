@@ -1,8 +1,10 @@
 package net.thekingofduck.loki.mapper;
 
+import net.thekingofduck.loki.entity.CanvasEnity;
 import net.thekingofduck.loki.entity.HttpLogEntity;
 import net.thekingofduck.loki.entity.UserInfoEntity;
 import org.apache.ibatis.annotations.*;
+import org.springframework.http.HttpEntity;
 
 import java.util.List;
 
@@ -33,7 +35,20 @@ public interface HttpLogMapper {
     @Insert("INSERT INTO `main`.`httplog`(`ip`,`method`,`path`,`parameter`,`headers`,`body`,`time`) VALUES (#{ip},#{method},#{path},#{parameter},#{headers},#{body},#{time})")
     Integer addHttpLog(String ip,String method,String path,String parameter,String headers,String body,String time);
     /**
+     * 插入canvas指纹到最新的日志记录中
+     */
+    @Update("UPDATE `main`.`httplog` SET `canvasId` = #{canvasId} WHERE id = (SELECT MAX(id) FROM `main`.`httplog`)")
+    Integer updateCanvasId(String canvasId);
+    /**
+     * 插入canvasId(外键)到canvas表中
+     */
+    @Insert("Insert INTO `main`.`canvas`(`canvasId`) values (#{canvasId})")
+    Integer addCanvasId(String canvasId);
+
+    /**
      * httplog delete
+     * @param id
+     * @return
      */
     @Delete("DELETE FROM `main`.`httplog` WHERE rowid = #{id}")
     Integer deleteHttpLogById(int id);
@@ -88,4 +103,33 @@ public interface HttpLogMapper {
      */
     @Select("SELECT id, ip, method, path, parameter, body, headers, time FROM httplog ORDER BY ip, time ASC")
     List<HttpLogEntity> selectAllLogs();
+    /**
+     * 返回canvas表中的值
+     */
+    @Select("select * from canvas order by number desc limit (#{page}-1)*#{limit},#{limit}")
+    List<CanvasEnity> selectAllCanvaslogs(Integer page,Integer limit);
+    @Select("SELECT COUNT(*) FROM canvas")
+    int countTotalCanvasLogs();
+
+    /**
+     * 根据canvasId查询number(对应序号)
+     */
+    @Select("select number from canvas where canvasId = #{canvasId}")
+    Integer getCanvasNumber(String canvasId);
+    /**
+     * 根据canvasId从关联表httplog中查询出所有iP，body字段信息
+     */
+    @Select("SELECT t2.iP, t2.body FROM canvas AS t1 JOIN httplog AS t2 ON t1.canvasId = t2.canvasId WHERE t1.canvasId = #{canvasId}")
+    public List<HttpLogEntity> findIpsAndBodiesByCanvasId(String canvasId);
+    /**
+     * 插入canvasId到canvas表中时防止重复
+     */
+    @Select("select count(*) from canvas where canvasId = #{canvasId}")
+    Integer getCanvasIdCount(String canvasId);
+
+    /**
+     * 从httplog表中拿出所有对于canvasId的数据并交给AI分析
+     */
+    @Select("select * from httplog where canvasId = #{canvasId}")
+    public List<HttpLogEntity> getAllInfoByCanvasId(String canvasId);
 }

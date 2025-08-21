@@ -2,9 +2,168 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>监控大屏 - 地图模式</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        #main {
+            width: 100vw;
+            height: 90vh; /* 地图容器 */
+        }
+        #continent-switcher {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #continent-switcher button {
+            background-color: #337ab7;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        #continent-switcher button:hover {
+            background-color: #286090;
+        }
+    </style>
 </head>
 <body>
 
+<div id="continent-switcher">
+    <button onclick="switchContinent('world')">世界</button>
+    <button onclick="switchContinent('china')">中国</button>
+    <button onclick="switchContinent('europe')">欧洲</button>
+</div>
+
+<div id="main"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/world.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/china.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/europe.js"></script>
+
+<script>
+    const chartDom = document.getElementById('main');
+    const myChart = echarts.init(chartDom, 'dark');
+
+    // 自定义闪烁的散点样式
+    const flashingSeriesStyle = {
+        name: '攻击IP',
+        type: 'scatter',
+        coordinateSystem: 'geo',
+        symbolSize: 10,
+        itemStyle: {
+            color: 'red'
+        },
+        label: {
+            show: false
+        },
+        tooltip: {
+            formatter: '{b}'
+        },
+        rippleEffect: {
+            period: 2,
+            scale: 4,
+            brushType: 'stroke'
+        },
+        data: []
+    };
+
+    // 我们预先加载了地图文件，所以这里只需要设置ECharts的注册地图
+    // 确保你引入了对应的JS文件
+
+    /**
+     * 获取并更新地图上的攻击IP标记
+     * @param {string} mapName - 地图名称（例如：'world', 'china', 'europe'）
+     */
+    async function fetchAndRenderIPs(mapName) {
+        try {
+            // 1. 调用后端API获取IP列表
+            const response = await fetch('http://127.0.0.1:65535/api/logs/analyze');
+            const data = await response.json();
+
+            const attackIPs = data.map(item => item.ip);
+            const seriesData = [];
+
+            // 2. 遍历IP列表，获取地理位置
+            for (const ip of attackIPs) {
+                try {
+                    const geoResponse = await fetch(`http://ip-api.com/json/${ip}`);
+                    const geoData = await geoResponse.json();
+
+                    if (geoData.status === 'success') {
+                        const { lat, lon, city, country } = geoData;
+                        seriesData.push({
+                            name: `${ip}<br>${country}, ${city}`,
+                            value: [lon, lat] // ECharts 坐标系要求 [经度, 纬度]
+                        });
+                    }
+                } catch (geoError) {
+                    console.error(`无法获取 IP ${ip} 的地理位置信息:`, geoError);
+                }
+            }
+
+            // 3. 更新地图配置
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{b}'
+                },
+                geo: {
+                    map: mapName, // 使用传入的地图名称
+                    roam: false,
+                    zoom: 1.2,
+                    label: {
+                        show: false,
+                    },
+                    itemStyle: {
+                        areaColor: '#0c223c',
+                        borderColor: '#409eff'
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            areaColor: '#0f3258'
+                        },
+                    }
+                },
+                series: [{
+                    ...flashingSeriesStyle,
+                    data: seriesData
+                }]
+            };
+
+            myChart.setOption(option);
+        } catch (apiError) {
+            console.error('调用后端API失败:', apiError);
+        }
+    }
+
+    /**
+     * 切换大洲的函数
+     * @param {string} mapName - 地图名称
+     */
+    function switchContinent(mapName) {
+        myChart.showLoading();
+        fetchAndRenderIPs(mapName);
+        myChart.hideLoading();
+    }
+
+    // 初始加载世界地图
+    switchContinent('world');
+
+    // 可选：每隔一段时间刷新一次数据，例如每 30 秒
+    setInterval(() => {
+        const currentMapName = myChart.getOption().geo[0].map;
+        fetchAndRenderIPs(currentMapName);
+    }, 3000);
+</script>
 </body>
 </html>

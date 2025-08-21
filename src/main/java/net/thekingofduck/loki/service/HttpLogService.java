@@ -2,7 +2,6 @@ package net.thekingofduck.loki.service;
 
 import net.thekingofduck.loki.common.AttackPattern;
 import net.thekingofduck.loki.entity.HttpLogEntity;
-import net.thekingofduck.loki.entity.IpLogGroup;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,9 +13,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
 
 @Service
 public class HttpLogService {
@@ -78,81 +76,53 @@ public class HttpLogService {
     }
 
     /**
-     * 读取日志，按IP分组，并匹配攻击模式
+     * 根据canvasId查询相关信息并进行分析
      *
-     * @return 包含IP和检测到的攻击方式的JSON字符串 (只包含有攻击的IP)
+     * @param canvasId 传入的canvasId
+     * @return 包含 number, 去重后IPs, 和去重后攻击方式的JSON字符串
      */
-    public String analyzeLogsAndDetectAttacks() {
-        // 1. 从数据库读取所有日志
-        List<HttpLogEntity> allLogs = httpLogMapper.selectAllLogs();
+    public String getHackerInfoAndAttackAnalysis(String canvasId) {
+        // 1. 根据 canvasId 查询 number (黑客ID)
+        Integer number = httpLogMapper.getCanvasNumber(canvasId);
 
-        // 2. 按IP进行分组
-        Map<String, IpLogGroup> ipLogGroupsMap = new LinkedHashMap<>();
-        for (HttpLogEntity log : allLogs) {
-            String ip = log.getIp();
-            ipLogGroupsMap.computeIfAbsent(ip, k -> {
-                IpLogGroup group = new IpLogGroup();
-                group.setIp(k);
-                group.setLogs(new ArrayList<>());
-                return group;
-            }).getLogs().add(log);
+        // 2. 根据 canvasId 查询 IP 和 body 列表
+        List<HttpLogEntity> logs = httpLogMapper.findIpsAndBodiesByCanvasId(canvasId);
+
+        // 3. 去重 IP
+        Set<String> uniqueIps = logs.stream()
+                .map(HttpLogEntity::getIp)
+                .collect(Collectors.toSet());
+
+        // 4. 对所有 body 内容进行正则匹配，并去重攻击方式
+        Set<String> uniqueAttackMethods = new HashSet<>();
+        for (HttpLogEntity log : logs) {
+            String body = log.getBody();
+            if (body == null || body.trim().isEmpty()) {
+                continue;
+            }
+
+            for (AttackPattern pattern : attackPatterns) {
+                if (pattern.matches(body)) {
+                    uniqueAttackMethods.add(pattern.getName());
+                }
+            }
         }
 
-        // 3. 遍历每个IP组，对所有body内容进行攻击模式匹配
+        // 5. 封装为 JSON 对象并返回
         ObjectMapper objectMapper = new ObjectMapper();
-        ArrayNode resultArray = objectMapper.createArrayNode();
+        ObjectNode resultNode = objectMapper.createObjectNode();
+        resultNode.put("number", number);
 
-        for (Map.Entry<String, IpLogGroup> entry : ipLogGroupsMap.entrySet()) {
-            String ip = entry.getKey();
-            IpLogGroup ipLogGroup = entry.getValue();
-            Set<String> detectedAttackTypes = new HashSet<>(); // 使用Set避免重复的攻击类型
+        ArrayNode ipArrayNode = objectMapper.createArrayNode();
+        uniqueIps.forEach(ipArrayNode::add);
+        resultNode.set("ips", ipArrayNode);
 
-            // 遍历该IP下的所有日志
-            for (HttpLogEntity log : ipLogGroup.getLogs()) {
-                String body = log.getBody();
-                if (body == null || body.trim().isEmpty()) {
-                    continue; // 跳过空的body
-                }
-
-                String lowerCaseBody = body.toLowerCase();
-
-                for (AttackPattern pattern : attackPatterns) {
-                    boolean keywordFound = false;
-                    for (String keyword : pattern.getKeywords()) {
-                        if (lowerCaseBody.contains(keyword.toLowerCase())) {
-                            keywordFound = true;
-                            break;
-                        }
-                    }
-
-                    if (keywordFound || pattern.getKeywords().isEmpty()) {
-                        if (pattern.matches(body)) {
-                            detectedAttackTypes.add(pattern.getName());
-                        }
-                    }
-                }
-            }
-
-            // **** 核心修改开始 ****
-            // 只有当 detectedAttackTypes 不为空时，才将该 IP 的数据添加到结果数组中
-            if (!detectedAttackTypes.isEmpty()) {
-                ObjectNode ipResultNode = objectMapper.createObjectNode();
-                ipResultNode.put("ip", ip);
-
-                ArrayNode attackTypesArray = objectMapper.createArrayNode();
-                for (String type : detectedAttackTypes) {
-                    attackTypesArray.add(type);
-                }
-                ipResultNode.set("attack_types", attackTypesArray);
-
-                resultArray.add(ipResultNode);
-            }
-            // **** 核心修改结束 ****
-        }
+        ArrayNode attackMethodArrayNode = objectMapper.createArrayNode();
+        uniqueAttackMethods.forEach(attackMethodArrayNode::add);
+        resultNode.set("attackMethods", attackMethodArrayNode);
 
         try {
-            String jsonOutput = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(resultArray);
-            return jsonOutput;
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(resultNode);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             e.printStackTrace();
             return "{\"error\": \"Failed to convert to JSON\", \"details\": \"" + e.getMessage() + "\"}";

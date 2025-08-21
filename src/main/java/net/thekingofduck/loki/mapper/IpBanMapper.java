@@ -23,19 +23,19 @@ public interface IpBanMapper {
      * 将指定 IP 的封禁状态设置为 0 (解封)。
      * 针对表 `httplog` 和字段 `isBan` 进行操作。
      *
-     * @param ip 要解封的 IP 地址
+     * @param canvasId 要解封的 IP 地址
      * @return 更新的记录数
      */
-    @Update("UPDATE httplog SET isBan = 0 WHERE ip = #{ip}")
-    int updateIpStatus0(@Param("ip") String ip);
+    @Update("UPDATE httplog SET isBan = 0 WHERE canvasId = #{canvasId}")
+    int updateIpStatus0(@Param("canvasId") String canvasId);
 
     /**
      * 将指定 IP 的封禁状态设置为 1 (封禁)。
      * 针对表 `httplog` 和字段 `isBan` 进行操作。
      *
-     * @param ip 要封禁的 IP 地址
+     * @param canvasId 要封禁的 IP 地址
      * @return 更新的记录数
      */
-    @Update("UPDATE httplog SET isBan = 1 WHERE ip = #{ip}")
-    int updateIpStatus1(@Param("ip") String ip);
+    @Update("UPDATE httplog SET isBan = 1 WHERE canvasId = #{canvasId}")
+    int updateIpStatus1(@Param("canvasId") String canvasId);
 }

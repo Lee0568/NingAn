@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黑客画像 - 详情</title>
+    <style>
+        /* 页面基础样式 */
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* 防止滚动条 */
+        }
+
+        /* 主容器：模拟整个视图 */
+        .main-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            padding: 30px;
+            gap: 30px;
+        }
+
+        /* 左侧面板：基础信息和操作 */
+        .panel {
+            background-color: #2a2a2a;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .basic-panel {
+            flex: 0 0 450px; /* 左侧面板固定宽度 */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            color: #00ffff;
+            border-bottom: 2px solid #00cc00;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .info-card {
+            background-color: #3a3a3a;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .info-card > div {
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+        }
+
+        .hacker-id, .ip-address, .fingerprint {
+            margin-bottom: 10px;
+            position: relative; /* 核心：为子元素的绝对定位提供参考 */
+        }
+
+        .info-label {
+            color: #fff;
+            margin-right: 10px;
+        }
+
+        .icon {
+            font-size: 1.2em;
+            margin-right: 5px;
+        }
+
+        /* IP 列表容器样式 */
+        .ip-list-container,
+        #fingerprint-full-container {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #2a2a2a;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 1000;
+            display: none; /* 默认隐藏 */
+        }
+
+        .ip-list-container.show,
+        #fingerprint-full-container.show {
+            display: block; /* 悬停时显示 */
+        }
+
+        .ip-list, #fingerprint-full-text {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            color: #00ff00;
+            white-space: nowrap;
+        }
+
+        /* 新增：指纹的省略号样式 */
+        #fingerprint-value {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px; /* 根据布局调整 */
+            transition: max-width 0.3s ease-in-out;
+        }
+
+        /* 修改攻击方式列表样式 */
+        .attack-types-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .attack-type {
+            font-size: 1em;
+            color: #00ffff;
+            border-bottom: 1px dashed #009900;
+            padding-bottom: 5px;
+        }
+
+        /* 按钮组 */
+        .button-group {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+
+        .action-btn {
+            padding: 12px 30px;
+            font-family: inherit;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            border: none;
+        }
+        .report-btn { background-color: #007bff; color: white; }
+        .report-btn:hover { background-color: #0056b3; transform: translateY(-2px); }
+        .ban-btn { background-color: #dc3545; color: white; }
+        .ban-btn:hover { background-color: #c82333; transform: translateY(-2px); }
+        .unban-btn { background-color: #28a745; color: white; }
+        .unban-btn:hover { background-color: #218838; transform: translateY(-2px); }
+
+        /* 右侧面板：智能报告 */
+        .smart-report-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+            position: relative;
+        }
+
+        /* 加载动画容器 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(30, 30, 30, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.5s linear;
+        }
+
+        .loading-overlay.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* 旋转动画 */
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #333;
+            border-top-color: #00ff00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #00ffff;
+        }
+
+        /* 威胁等级、活跃时间和建议都显示预设的空面板 */
+        .threat-rating-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed #009900;
+            padding-bottom: 20px;
+            min-height: 150px;
+        }
+        /* 威胁等级标题，带圆点 */
+        .threat-rating-title {
+            font-size: 2em;
+            color: #00ffff;
+            text-align: right;
+            line-height: 1.2;
+            position: relative;
+        }
+        /* 初始状态的威胁等级文本 */
+        .threat-level {
+            font-size: 3em;
+            font-weight: bold;
+            color: #ff0000;
+        }
+
+        /* 圆形进度条容器 */
+        .circular-progress-container {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .circular-progress {
+            width: 100%;
+            height: 100%;
+        }
+        .circular-progress-base {
+            fill: none;
+            stroke: #333;
+            stroke-width: 6;
+            stroke-dasharray: 283; /* 2 * pi * 45 */
+            stroke-dashoffset: 0;
+        }
+        .circular-progress-fill {
+            fill: none;
+            stroke-width: 6;
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 0.3s ease-out, stroke 0.3s ease-out;
+            transform: rotate(-90deg); /* 从顶部开始绘制 */
+            transform-origin: 50% 50%;
+        }
+
+        /* 活跃时间图表容器 */
+        .active-time-section {
+            flex-grow: 1;
+            border: 1px solid #009900;
+            border-radius: 10px;
+            padding: 20px;
+            background-color: #333;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow-y: hidden;
+        }
+        .active-time-section h3, .suggestions-section h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #009900;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        /* 确保 canvas 在 flex 布局中占据剩余空间 */
+        #active-time-chart { flex-grow: 1; }
+
+        /* 建议列表容器 */
+        .suggestions-section {
+            height: 250px;
+            border: 1px solid #009900;
+            border-radius: 10px;
+            padding: 20px;
+            background-color: #333;
+            box-sizing: border-box;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        /* 建议列表 */
+        #defense-suggestions-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        #defense-suggestions-list li {
+            padding: 5px 0;
+            border-bottom: 1px dashed #006600;
+        }
+        #defense-suggestions-list li:last-child {
+            border-bottom: none;
+        }
+
+        /* 新增：自动消失的提示框容器 */
+        .message-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            pointer-events: none; /* 允许点击穿透 */
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .message-container.show {
+            opacity: 1;
+        }
+
+        .message-box {
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 15px 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            font-size: 1.2em;
+            text-align: center;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+<div class="main-container">
+    <div class="panel basic-panel">
+        <h2 class="panel-title">基础面板</h2>
+        <div class="info-card">
+            <div class="hacker-id">
+                <span class="info-label">黑客ID:</span>
+                <span id="hacker-id-value"></span>
+            </div>
+            <div class="ip-address">
+                <span class="info-label">常用IP:</span>
+                <span id="ip-address-value"></span>
+                <div class="ip-list-container" id="ip-list-container">
+                    <ul class="ip-list" id="ip-list"></ul>
+                </div>
+            </div>
+            <div class="fingerprint">
+                <span class="info-label">浏览器指纹:</span>
+                <span id="fingerprint-value"></span>
+                <div id="fingerprint-full-container">
+                    <span id="fingerprint-full-text"></span>
+                </div>
+            </div>
+        </div>
+        <div class="button-group">
+            <button class="action-btn report-btn" id="generate-report">威胁分析</button>
+        </div>
+        <h3 class="panel-title">攻击方式</h3>
+        <div class="attack-types-section" id="attack-methods-list"></div>
+        <div class="button-group">
+            <button class="action-btn ban-btn" id="ban-ip">Ban IP</button>
+            <button class="action-btn unban-btn" id="unban-ip">Unban IP</button>
+        </div>
+    </div>
+    <div class="panel smart-report-panel">
+        <div id="loading-overlay" class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">正在生成报告...</div>
+        </div>
+
+        <h2 class="panel-title">威胁情报</h2>
+
+        <div class="threat-rating-section">
+            <div class="threat-rating-title">
+                威胁等级:
+                <div class="threat-level" id="threat-level-value"></div>
+            </div>
+            <div class="circular-progress-container" id="progress-container">
+                <svg class="circular-progress" viewBox="0 0 100 100">
+                    <circle class="circular-progress-base" cx="50" cy="50" r="45"></circle>
+                    <circle class="circular-progress-fill" cx="50" cy="50" r="45"></circle>
+                </svg>
+            </div>
+        </div>
+
+        <div class="active-time-section">
+            <h3>活跃时段图</h3>
+            <canvas id="active-time-chart"></canvas>
+        </div>
+
+        <div class="suggestions-section">
+            <h3>防御建议</h3>
+            <ul id="defense-suggestions-list"></ul>
+        </div>
+    </div>
+</div>
+
+<div id="message-container" class="message-container">
+    <div id="message-box" class="message-box"></div>
+</div>
+
+<script>
+    let myChart = null;
+    let currentCanvasId = null;
+    const DEEPSEEK_API_URL = 'http://localhost:65535/api/v2/AIReport';
+    const BASIC_DATA_API_URL = 'http://localhost:65535/api/logs/basehackerimg';
+
+    // IP 封禁/解封 API URL
+    const BAN_IP_API_URL = 'http://localhost:65535/api/ip-bans/ban';
+    const UNBAN_IP_API_URL = 'http://localhost:65535/api/ip-bans/unban';
+
+    // 渲染左侧面板数据（基础信息）
+    function renderBasicPanel(data) {
+        document.getElementById('hacker-id-value').textContent = data.number || 'N/A';
+
+        const ipAddressValueEl = document.getElementById('ip-address-value');
+        const ipListContainerEl = document.getElementById('ip-list-container');
+        const ipListEl = document.getElementById('ip-list');
+
+        if (data.ips && data.ips.length > 0) {
+            ipAddressValueEl.textContent = data.ips[0];
+            ipListEl.innerHTML = '';
+            data.ips.forEach(ip => {
+                const li = document.createElement('li');
+                li.textContent = ip;
+                ipListEl.appendChild(li);
+            });
+            const ipAddressEl = document.querySelector('.ip-address');
+            ipAddressEl.addEventListener('mouseenter', () => {
+                ipListContainerEl.classList.add('show');
+            });
+            ipAddressEl.addEventListener('mouseleave', () => {
+                ipListContainerEl.classList.remove('show');
+            });
+        } else {
+            ipAddressValueEl.textContent = 'N/A';
+            ipListEl.innerHTML = '';
+        }
+
+        const attackMethodsList = document.getElementById('attack-methods-list');
+        attackMethodsList.innerHTML = '';
+        if (data.attackMethods && data.attackMethods.length > 0) {
+            data.attackMethods.forEach(method => {
+                const methodHtml = `<div class="attack-type">${method}</div>`;
+                attackMethodsList.insertAdjacentHTML('beforeend', methodHtml);
+            });
+        } else {
+            attackMethodsList.innerHTML = `<div class="attack-type">暂无数据</div>`;
+        }
+    }
+
+    // 渲染右侧面板数据（报告）
+    function renderReportPanel(data) {
+        const threatLevelEl = document.getElementById('threat-level-value');
+        threatLevelEl.textContent = data.threatLevel || 'N/A';
+        if (threatLevelEl.textContent !== 'N/A') {
+            if (data.threatLevel === 'HIGH') {
+                threatLevelEl.style.color = '#ff0000';
+            } else if (data.threatLevel === 'MEDIUM') {
+                threatLevelEl.style.color = '#ffcc00';
+            } else if (data.threatLevel === 'LOW') {
+                threatLevelEl.style.color = '#00ff00';
+            }
+        } else {
+            threatLevelEl.textContent = 'N/A';
+            threatLevelEl.style.color = '#ccc';
+        }
+
+        const progressFill = document.querySelector('.circular-progress-fill');
+        const circumference = 2 * Math.PI * 45;
+        const threatScore = data.threatScore || 0;
+        const offset = circumference * (1 - (threatScore / 100));
+        progressFill.style.strokeDashoffset = offset;
+
+        if (threatScore > 70) {
+            progressFill.style.stroke = '#ff0000';
+        } else if (threatScore > 40) {
+            progressFill.style.stroke = '#ffcc00';
+        } else if (threatScore > 0) {
+            progressFill.style.stroke = '#00ff00';
+        } else {
+            progressFill.style.stroke = '#444';
+        }
+
+        const suggestionsList = document.getElementById('defense-suggestions-list');
+        suggestionsList.innerHTML = '';
+        if (data.defenseSuggestions && data.defenseSuggestions.length > 0) {
+            data.defenseSuggestions.forEach(suggestion => {
+                const li = document.createElement('li');
+                li.textContent = suggestion;
+                suggestionsList.appendChild(li);
+            });
+        } else {
+            const li = document.createElement('li');
+            li.textContent = '暂无建议';
+            suggestionsList.appendChild(li);
+        }
+
+        if (myChart) {
+            myChart.destroy();
+        }
+        const ctx = document.getElementById('active-time-chart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.activeTimeData?.labels || [],
+                datasets: [{
+                    label: '攻击次数',
+                    data: data.activeTimeData?.data || [],
+                    borderColor: '#00ff00',
+                    backgroundColor: 'rgba(0, 255, 0, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#00ffff',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        ticks: { color: '#00ff00' },
+                        grid: { color: '#333' },
+                        title: { display: true, text: '时间 (24小时制)', color: '#00ff00' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#00ff00' },
+                        grid: { color: '#333' },
+                        title: { display: true, text: '攻击次数', color: '#00ff00' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#333',
+                        titleColor: '#00ff00',
+                        bodyColor: '#00ffff'
+                    }
+                }
+            }
+        });
+    }
+
+    // 生成报告的函数，由按钮点击触发
+    const generateReport = async () => {
+        if (!currentCanvasId) {
+            console.error('未找到有效的canvasId，无法生成报告。');
+            return;
+        }
+
+        // 获取加载动画元素
+        const loadingOverlay = document.getElementById('loading-overlay');
+        // 显示加载动画
+        loadingOverlay.classList.add('show');
+
+        const apiUrl = `${DEEPSEEK_API_URL}?canvasId=${currentCanvasId}`;
+
+        try {
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            renderReportPanel(data);
+            console.log('报告数据已加载并渲染完成。');
+        } catch (error) {
+            console.error('获取报告数据失败:', error);
+            document.getElementById('threat-level-value').textContent = 'N/A';
+
+            // 失败时，重置 SVG 进度条到初始状态
+            const progressFill = document.querySelector('.circular-progress-fill');
+            const circumference = 2 * Math.PI * 45;
+            progressFill.style.strokeDashoffset = circumference;
+            progressFill.style.stroke = '#444';
+
+            if (myChart) {
+                myChart.destroy();
+                myChart = null;
+            }
+            document.getElementById('defense-suggestions-list').innerHTML = '';
+        } finally {
+            // 无论成功或失败，都隐藏加载动画
+            loadingOverlay.classList.remove('show');
+        }
+    };
+
+    const loadBasicData = async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentCanvasId = urlParams.get('canvasId');
+
+        if (!currentCanvasId) {
+            console.error('URL中未找到canvasId参数，无法加载数据。');
+            return;
+        }
+
+        document.getElementById('fingerprint-value').textContent = currentCanvasId;
+        document.getElementById('fingerprint-full-text').textContent = currentCanvasId;
+
+        const fingerprintEl = document.querySelector('.fingerprint');
+        const fullContainer = document.getElementById('fingerprint-full-container');
+
+        fingerprintEl.addEventListener('mouseenter', () => {
+            fullContainer.classList.add('show');
+        });
+        fingerprintEl.addEventListener('mouseleave', () => {
+            fullContainer.classList.remove('show');
+        });
+
+        const apiUrlForBasic = `${BASIC_DATA_API_URL}?canvasId=${currentCanvasId}`;
+        try {
+            const response = await fetch(apiUrlForBasic);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            renderBasicPanel(data);
+            console.log('基本数据已加载并渲染完成。');
+        } catch (error) {
+            console.error('获取基本数据失败:', error);
+            document.querySelector('.basic-panel').innerHTML = `<p style="text-align: center; color: red;">无法加载基本数据，请检查服务或网络连接。</p>`;
+        }
+    };
+
+    // 新增：自动消失的提示框函数
+    // 默认消失时间已修改为 2000 毫秒（2秒）
+    function showMessage(message, duration = 1500) {
+        const messageContainer = document.getElementById('message-container');
+        const messageBox = document.getElementById('message-box');
+
+        if (!messageContainer || !messageBox) {
+            console.error('Message container or box not found. The message cannot be displayed.');
+            return;
+        }
+
+        messageBox.textContent = message;
+        messageContainer.classList.add('show');
+
+        setTimeout(() => {
+            messageContainer.classList.remove('show');
+        }, duration);
+    }
+
+    // 封装通用的请求函数，只传递 canvasId
+    const sendIpAction = async (actionUrl) => {
+        // 获取 canvasId（浏览器指纹）
+        const canvasId = document.getElementById('fingerprint-value').textContent;
+
+        if (!canvasId || canvasId === 'N/A') {
+            showMessage('当前没有可用的浏览器指纹');
+            return;
+        }
+
+        // 创建 URLSearchParams 对象来构建请求体，只包含 canvasId
+        const params = new URLSearchParams();
+        params.append('canvasId', canvasId);
+
+        try {
+            const response = await fetch(actionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: params.toString() // 将参数对象转为字符串
+            });
+
+            if (response.ok) {
+                const message = `指纹: ${canvasId} 操作成功！`;
+                showMessage(message);
+            } else {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            }
+        } catch (error) {
+            console.error('操作失败:', error);
+            const errorMessage = `操作失败: ${error.message}`;
+            showMessage(errorMessage);
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBasicData();
+
+        const generateReportBtn = document.getElementById('generate-report');
+        const banIpBtn = document.getElementById('ban-ip');
+        const unbanIpBtn = document.getElementById('unban-ip');
+
+        if (generateReportBtn) {
+            generateReportBtn.addEventListener('click', generateReport);
+        }
+
+        // 为 IP 封禁/解封按钮添加事件监听器
+        if (banIpBtn) {
+            banIpBtn.addEventListener('click', () => sendIpAction(BAN_IP_API_URL));
+        }
+        if (unbanIpBtn) {
+            unbanIpBtn.addEventListener('click', () => sendIpAction(UNBAN_IP_API_URL));
+        }
+    });
+</script>
+</body>
+</html>

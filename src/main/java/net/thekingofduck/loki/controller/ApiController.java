@@ -2,6 +2,7 @@ package net.thekingofduck.loki.controller;
 
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
+import net.thekingofduck.loki.entity.CanvasEnity;
 import net.thekingofduck.loki.entity.CommandEnity;
 import net.thekingofduck.loki.entity.HttpLogEntity;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
@@ -10,10 +11,12 @@ import net.thekingofduck.loki.service.AuthService;
 import net.thekingofduck.loki.service.DeepSeekService;
 import net.thekingofduck.loki.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletRequest; // 导入 HttpServletRequest
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -86,7 +89,19 @@ public class ApiController {
         // 1. 获取客户端IP地址
         String clientIp = getClientIp(request);
         httpLogEntity.setIp(clientIp); // 将获取到的IP设置到 HttpLogEntity 对象中
-        Integer rows = userService.insertHttpLog(httpLogEntity);
+        Integer rows1 = userService.insertHttpLog(httpLogEntity);
+
+
+        int id = httpLogEntity.getId();
+        String canvasId = httpLogEntity.getCanvasId();
+        Integer rows2 = httpLogMapper.updateCanvasId(canvasId);
+
+        if (httpLogMapper.getCanvasIdCount(canvasId)>0){
+            System.out.println("ok");
+        }else{
+            Integer rows3 = httpLogMapper.addCanvasId(canvasId);
+        }
+
         String username = httpLogEntity.getUsername();
         String password = httpLogEntity.getPassword();
         if(username.equals("admin")&&password.equals("123456")) {
@@ -118,15 +133,41 @@ public class ApiController {
 
     /**
      * dick控制层
-     * @param message
+     * @param canvasId
      * @return
      */
 // --- 关键修改：添加 produces = "text/plain;charset=UTF-8" ---
-    @PostMapping(value = "/v2/chat", produces = "text/plain;charset=UTF-8")
-    public String chat(@RequestParam String message) {
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @GetMapping(value = "/v2/AIReport", produces = "text/plain;charset=UTF-8")
+    public String chat(@RequestParam String canvasId) {
         // 调用 DeepSeekService 获取 DeepSeek API 的解析后的中文回复
-        String aiResponse = deepSeekService.callDeepSeek(message);
+        String aiResponse = deepSeekService.analyzeAndCallDeepSeek(canvasId);
         return aiResponse;
+    }
+
+    @GetMapping("/canvaslog")
+    public ResponseEntity<Map<String, Object>> getCanvasLog(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer limit) {
+
+        // 查询总记录数
+        int totalItems = httpLogMapper.countTotalCanvasLogs();
+
+        // 计算总页数
+        int totalPages = (int) Math.ceil((double) totalItems / limit);
+
+        // 查询分页后的数据
+        List<CanvasEnity> items = httpLogMapper.selectAllCanvaslogs(page, limit);
+
+        // 封装返回结果
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("items", items);
+        responseData.put("totalCount", totalItems);
+        responseData.put("totalPages", totalPages);
+        responseData.put("currentPage", page);
+
+        // 返回 JSON 格式的响应
+        return ResponseEntity.ok(responseData);
     }
     public static class HomeInfo {
         public String title;
@@ -191,7 +232,8 @@ public class ApiController {
         HomeInfo homeInfo = new HomeInfo("首页", "./page/index.html");
         LogoInfo logoInfo = new LogoInfo("柠安", "images/logo.png", "");
         List<MenuChild> childList = List.of(
-                new MenuChild("可视化", "page/bigdata.html", "fa fa-filter", "_self"),
+                new MenuChild("欢迎页", "page/index.html", "fa fa-filter", "_self"),
+                new MenuChild("监控大屏", "page/bigdata.html", "fa fa-filter", "_self"),
                 new MenuChild("流量管理", "page/httplog.html", "fa fa-filter", "_self"),
                 new MenuChild("钓鱼管理", "page/fishing.html", "fa fa-anchor", "_self"),
                 new MenuChild("黑客画像", "page/hackImg.html", "fa fa-gears", "_self"),

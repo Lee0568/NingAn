@@ -21,4 +21,5 @@ public class HttpLogEntity {
     private String time;
     private String username = "xxx";
     private String password = "xxx";
+    private String canvasId;
 }
