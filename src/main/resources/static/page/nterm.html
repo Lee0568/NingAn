@@ -14,11 +14,13 @@
             flex-direction: row;
         }
         .terminal {
-            background-color: #000;
-            color: #fff;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
             padding: 15px;
-            border-radius: 4px;
-            font-family: monospace;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
             height: 500px;
             overflow-y: auto;
             white-space: pre-wrap;
@@ -27,10 +29,42 @@
             user-select: text;
             flex-grow: 1;
             margin-right: 10px;
+            border: 1px solid #333;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
         }
         .terminal:focus {
-            outline: 2px solid #00ff00;
+            outline: 2px solid #007acc;
+            border-color: #007acc;
         }
+        /* ANSI 颜色支持 */
+        .ansi-black { color: #000000; }
+        .ansi-red { color: #cd3131; }
+        .ansi-green { color: #0dbc79; }
+        .ansi-yellow { color: #e5e510; }
+        .ansi-blue { color: #2472c8; }
+        .ansi-magenta { color: #bc3fbc; }
+        .ansi-cyan { color: #11a8cd; }
+        .ansi-white { color: #e5e5e5; }
+        .ansi-bright-black { color: #666666; }
+        .ansi-bright-red { color: #f14c4c; }
+        .ansi-bright-green { color: #23d18b; }
+        .ansi-bright-yellow { color: #f5f543; }
+        .ansi-bright-blue { color: #3b8eea; }
+        .ansi-bright-magenta { color: #d670d6; }
+        .ansi-bright-cyan { color: #29b8db; }
+        .ansi-bright-white { color: #ffffff; }
+        .ansi-bg-black { background-color: #000000; }
+        .ansi-bg-red { background-color: #cd3131; }
+        .ansi-bg-green { background-color: #0dbc79; }
+        .ansi-bg-yellow { background-color: #e5e510; }
+        .ansi-bg-blue { background-color: #2472c8; }
+        .ansi-bg-magenta { background-color: #bc3fbc; }
+        .ansi-bg-cyan { background-color: #11a8cd; }
+        .ansi-bg-white { background-color: #e5e5e5; }
+        .ansi-bold { font-weight: bold; }
+        .ansi-dim { opacity: 0.5; }
+        .ansi-italic { font-style: italic; }
+        .ansi-underline { text-decoration: underline; }
         .server-panel {
             width: 25%;
             background-color: #f5f5f5;
@@ -69,7 +103,21 @@
             <legend>终端控制</legend>
             <div style="margin: 10px 10px 10px 10px">
                 <div class="terminal-container">
-                    <div class="terminal" id="terminal-output" tabindex="0"></div>
+                    <div style="flex-grow: 1; margin-right: 10px;">
+                        <div class="terminal" id="terminal-output" tabindex="0"></div>
+                        <!-- 添加输入框作为备用方案 -->
+                        <div style="margin-top: 10px; display: none;" id="input-fallback">
+                            <div style="background-color: #333; padding: 10px; border-radius: 4px;">
+                                <label style="color: #fff; margin-bottom: 5px; display: block;">命令输入框 (备用方案):</label>
+                                <div style="display: flex; align-items: center;">
+                                    <input type="text" id="command-input" placeholder="在此输入命令..." 
+                                           style="flex: 1; padding: 5px; border: 1px solid #555; background-color: #222; color: #fff; font-family: monospace;">
+                                    <button type="button" id="send-command" style="margin-left: 5px; padding: 5px 10px; background-color: #007cba; color: white; border: none; border-radius: 3px;">发送</button>
+                                    <button type="button" id="toggle-input" style="margin-left: 5px; padding: 5px 10px; background-color: #666; color: white; border: none; border-radius: 3px;">隐藏</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="server-panel">
                         <h3>服务器管理</h3>
                         <!-- 添加切换按钮 -->
@@ -116,6 +164,7 @@
                                         <button type="button" class="layui-btn" id="connect-btn" lay-submit lay-filter="connect">连接</button>
                                         <button type="button" class="layui-btn layui-btn-danger" id="disconnect-btn" style="display:none;">断开</button>
                                         <button type="button" class="layui-btn layui-btn-normal" id="save-server-btn" lay-submit lay-filter="save-server">保存</button>
+                                        <button type="button" class="layui-btn layui-btn-warm" id="show-input-btn" style="display:none;">显示输入框</button>
                                     </div>
                                 </div>
                             </form>
@@ -148,6 +197,71 @@
         // commandBuffer已移除，现在直接发送字符到SSH
         let servers = []; // 服务器列表
         let currentPanel = 'add'; // 当前面板，默认为添加服务器面板
+        
+        // 获取终端元素
+        const $terminal = $('#terminal-output');
+        
+        // 处理ANSI转义序列
+        function processAnsiEscapes(text) {
+            // 转义HTML特殊字符
+            text = text.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;');
+            
+            // 处理ANSI颜色代码
+            text = text.replace(/\x1b\[(\d+(?:;\d+)*)m/g, function(match, codes) {
+                const codeArray = codes.split(';').map(Number);
+                let classes = [];
+                
+                for (let code of codeArray) {
+                    switch (code) {
+                        case 0: return '</span>'; // 重置
+                        case 1: classes.push('ansi-bold'); break;
+                        case 2: classes.push('ansi-dim'); break;
+                        case 3: classes.push('ansi-italic'); break;
+                        case 4: classes.push('ansi-underline'); break;
+                        case 30: classes.push('ansi-black'); break;
+                        case 31: classes.push('ansi-red'); break;
+                        case 32: classes.push('ansi-green'); break;
+                        case 33: classes.push('ansi-yellow'); break;
+                        case 34: classes.push('ansi-blue'); break;
+                        case 35: classes.push('ansi-magenta'); break;
+                        case 36: classes.push('ansi-cyan'); break;
+                        case 37: classes.push('ansi-white'); break;
+                        case 90: classes.push('ansi-bright-black'); break;
+                        case 91: classes.push('ansi-bright-red'); break;
+                        case 92: classes.push('ansi-bright-green'); break;
+                        case 93: classes.push('ansi-bright-yellow'); break;
+                        case 94: classes.push('ansi-bright-blue'); break;
+                        case 95: classes.push('ansi-bright-magenta'); break;
+                        case 96: classes.push('ansi-bright-cyan'); break;
+                        case 97: classes.push('ansi-bright-white'); break;
+                        case 40: classes.push('ansi-bg-black'); break;
+                        case 41: classes.push('ansi-bg-red'); break;
+                        case 42: classes.push('ansi-bg-green'); break;
+                        case 43: classes.push('ansi-bg-yellow'); break;
+                        case 44: classes.push('ansi-bg-blue'); break;
+                        case 45: classes.push('ansi-bg-magenta'); break;
+                        case 46: classes.push('ansi-bg-cyan'); break;
+                        case 47: classes.push('ansi-bg-white'); break;
+                    }
+                }
+                
+                if (classes.length > 0) {
+                    return '<span class="' + classes.join(' ') + '">';
+                }
+                return '';
+            });
+            
+            // 处理其他ANSI转义序列（清屏、光标移动等）
+            text = text.replace(/\x1b\[2J/g, ''); // 清屏
+            text = text.replace(/\x1b\[H/g, ''); // 光标移动到左上角
+            text = text.replace(/\x1b\[\d+;\d+H/g, ''); // 光标移动到指定位置
+            text = text.replace(/\x1b\[\d*[ABCD]/g, ''); // 光标移动
+            text = text.replace(/\x1b\[\d*[JK]/g, ''); // 清除行或屏幕
+            
+            return text;
+        }
 
         // 切换到添加服务器面板
         function showAddServerPanel() {
@@ -216,6 +330,7 @@
                                 <div>用户: ${server.username}</div>
                             </div>
                             <div>
+                                <button class="layui-btn layui-btn-xs connect-server" data-index="${index}">连接</button>
                                 <button class="layui-btn layui-btn-danger layui-btn-xs delete-server" data-id="${server.id}">删除</button>
                             </div>
                         </div>
@@ -223,6 +338,58 @@
                 `);
                 $serverList.append(serverItem);
             });
+            
+            // 绑定连接按钮事件
+             $('.connect-server').on('click', function(event) {
+                 event.stopPropagation();
+                 const index = $(this).data('index');
+                 const server = servers[index];
+                 
+                 // 检查是否有保存的密码
+                 if (server.password && server.password.trim() !== '') {
+                     // 直接使用保存的密码连接
+                     const connectInfo = {
+                         host: server.host,
+                         port: parseInt(server.port),
+                         username: server.username,
+                         password: server.password
+                     };
+                     
+                     // 填充表单显示连接信息
+                     showAddServerPanel();
+                     $('#host').val(server.host);
+                     $('#port').val(server.port);
+                     $('#username').val(server.username);
+                     $('#password').val(server.password);
+                     $('#remark').val(server.remark || '');
+                     
+                     initWebSocket(connectInfo);
+                 } else {
+                     // 如果没有保存密码，提示用户输入
+                     showAddServerPanel();
+                     $('#host').val(server.host);
+                     $('#port').val(server.port);
+                     $('#username').val(server.username);
+                     $('#remark').val(server.remark || '');
+                     
+                     layer.prompt({
+                         title: '请输入密码连接到 ' + (server.remark || server.host),
+                         formType: 1 // 密码框
+                     }, function(password, index){
+                         layer.close(index);
+                         $('#password').val(password);
+                         
+                         const connectInfo = {
+                             host: server.host,
+                             port: parseInt(server.port),
+                             username: server.username,
+                             password: password
+                         };
+                         
+                         initWebSocket(connectInfo);
+                     });
+                 }
+             });
             
             // 绑定点击事件
             $('.server-item').on('click', function() {
@@ -403,18 +570,47 @@
                 window.terminalWebSocket.close();
             }
         });
+        
+        // 显示输入框按钮事件
+        $('#show-input-btn').on('click', function(){
+            $('#input-fallback').show();
+            $('#command-input').focus();
+        });
+        
+        // 隐藏输入框按钮事件
+        $('#toggle-input').on('click', function(){
+            $('#input-fallback').hide();
+            $terminal.focus();
+        });
+        
+        // 发送命令按钮事件
+        $('#send-command').on('click', function(){
+            const command = $('#command-input').val();
+            if (command && isConnected && window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                window.terminalWebSocket.send(command + '\r');
+                $('#command-input').val(''); // 清空输入框
+                console.log('通过输入框发送命令:', command);
+            }
+        });
+        
+        // 输入框回车事件
+        $('#command-input').on('keypress', function(event){
+            if (event.which === 13) { // 回车键
+                $('#send-command').click();
+            }
+        });
 
         // 终端区域事件处理
-        const $terminal = $('#terminal-output');
-        
         // 点击终端区域时聚焦
         $terminal.on('click', function() {
             $(this).focus();
+            console.log('终端被点击，已聚焦');
         });
         
         // 页面加载完成后确保终端能正确获取焦点
         $(document).ready(function() {
             $terminal.attr('tabindex', '0').focus();
+            console.log('页面加载完成，终端已聚焦');
         });
 
         // 处理粘贴事件
@@ -431,11 +627,12 @@
 
         // 终端键盘事件
         $terminal.on('keydown', function(event) {
-            console.log('键盘事件触发:', event.key, '连接状态:', isConnected);
+            console.log('键盘事件触发:', event.key, '连接状态:', isConnected, '焦点状态:', $(this).is(':focus'));
             
             // 确保终端有焦点
             if (!$(this).is(':focus')) {
                 $(this).focus();
+                console.log('重新聚焦终端');
             }
             
             // 检查WebSocket状态，如果WebSocket不存在或未连接，重置连接状态
@@ -483,13 +680,39 @@
             // 处理删除键
             if (event.key === 'Delete') {
                 event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[3~'); // Delete键
+                }
                 return;
             }
 
-            // 处理左/右箭头键
-            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
-                event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            // 处理箭头键 - 发送ANSI转义序列
+            if (event.key === 'ArrowLeft') {
                 event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[D'); // 左箭头
+                }
+                return;
+            }
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[C'); // 右箭头
+                }
+                return;
+            }
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[A'); // 上箭头
+                }
+                return;
+            }
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[B'); // 下箭头
+                }
                 return;
             }
 
@@ -503,9 +726,50 @@
                 return;
             }
 
-            // 处理Home/End键
-            if (event.key === 'Home' || event.key === 'End') {
+            // 处理Home/End键 - 发送ANSI转义序列
+            if (event.key === 'Home') {
                 event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[H'); // Home键
+                }
+                return;
+            }
+            if (event.key === 'End') {
+                event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[F'); // End键
+                }
+                return;
+            }
+
+            // 处理Page Up/Page Down键
+            if (event.key === 'PageUp') {
+                event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[5~'); // Page Up键
+                }
+                return;
+            }
+            if (event.key === 'PageDown') {
+                event.preventDefault();
+                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                    window.terminalWebSocket.send('\x1b[6~'); // Page Down键
+                }
+                return;
+            }
+
+            // 处理Ctrl组合键
+            if (event.ctrlKey && event.key.length === 1) {
+                event.preventDefault();
+                const char = event.key.toLowerCase();
+                if (char >= 'a' && char <= 'z') {
+                    // 发送Ctrl+字母组合键（ASCII控制字符）
+                    const ctrlChar = String.fromCharCode(char.charCodeAt(0) - 'a'.charCodeAt(0) + 1);
+                    if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                        window.terminalWebSocket.send(ctrlChar);
+                        console.log('发送Ctrl+' + char.toUpperCase() + ':', ctrlChar.charCodeAt(0));
+                    }
+                }
                 return;
             }
 
@@ -550,6 +814,7 @@
 
                 $('#connect-btn').hide();
                 $('#disconnect-btn').show();
+                $('#show-input-btn').show();
                 isConnected = true;
                 console.log('连接状态设置为true');
                 console.log('当前WebSocket readyState:', ws.readyState);
@@ -564,9 +829,15 @@
             };
 
             ws.onmessage = function(event) {
-                // 直接添加SSH输出内容
-                $terminal.append(event.data);
+                // 处理ANSI转义序列并添加SSH输出内容
+                const processedData = processAnsiEscapes(event.data);
+                $terminal.append(processedData);
                 scrollToBottom();
+                
+                // 确保终端保持焦点
+                if (!$terminal.is(':focus')) {
+                    $terminal.focus();
+                }
             };
 
             ws.onclose = function(event) {
@@ -575,6 +846,8 @@
                 scrollToBottom();
                 $('#connect-btn').show();
                 $('#disconnect-btn').hide();
+                $('#show-input-btn').hide();
+                $('#input-fallback').hide();
                 isConnected = false;
                 window.terminalWebSocket = null;
                 console.log('连接状态已重置为false，WebSocket已清空');
@@ -601,6 +874,23 @@
         setTimeout(function() {
             $terminal.attr('tabindex', '0').focus();
         }, 100);
+        
+        // 添加全局键盘事件监听作为备用方案
+        $(document).on('keydown', function(event) {
+            // 如果当前焦点不在输入框上，且终端已连接，则将键盘事件转发给终端
+            const activeElement = document.activeElement;
+            const isInputElement = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+            
+            if (!isInputElement && isConnected && window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                console.log('全局键盘事件捕获:', event.key);
+                
+                // 确保终端获得焦点
+                $terminal.focus();
+                
+                // 触发终端的键盘事件处理
+                $terminal.trigger(event);
+            }
+        });
     });
 </script>
 </body>

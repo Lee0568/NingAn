@@ -32,9 +32,13 @@
           "href": "./page/AI.html",
           "icon": "fa fa-gears",
           "target": "_self"
+        },
+        {
+          "title": "监控大屏",
+          "href": "http://localhost:65535/page/bigdata.html",
+          "icon": "fa fa-dashboard",
+          "target": "_blank"
         }
-
-
       ]
     }
   ]

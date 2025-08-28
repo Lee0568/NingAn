@@ -233,9 +233,9 @@ public class ApiController {
         LogoInfo logoInfo = new LogoInfo("柠安", "images/logo.png", "");
         List<MenuChild> childList = List.of(
                 new MenuChild("欢迎页", "page/index.html", "fa fa-filter", "_self"),
-                new MenuChild("监控大屏", "page/bigdata.html", "fa fa-filter", "_self"),
+                new MenuChild("监控大屏", "http://localhost:65535/page/bigdata.html", "fa fa-filter", "_blank"),
                 new MenuChild("流量管理", "page/httplog.html", "fa fa-filter", "_self"),
-                new MenuChild("钓鱼管理", "page/fishing.html", "fa fa-anchor", "_self"),
+                new MenuChild("蜜罐管理", "page/fishing.html", "fa fa-server", "_self"),
                 new MenuChild("黑客画像", "page/hackImg.html", "fa fa-gears", "_self"),
                 new MenuChild("终端", "page/nterm.html", "fa fa-gears", "_self"),
                 new MenuChild("文件管理", "page/mfile.html", "fa fa-gears", "_self"),

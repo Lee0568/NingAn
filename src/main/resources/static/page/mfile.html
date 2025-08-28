@@ -62,6 +62,13 @@
             display: flex;
             align-items: center;
         }
+        .file-item .file-actions {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .file-item:hover .file-actions {
+            opacity: 1;
+        }
         .file-item:hover {
             background-color: #f5f5f5;
         }
@@ -438,6 +445,11 @@
             currentServer = server;
             currentPath = '/';
             
+            // 显示连接中状态
+            const loadingIndex = layer.load(1, {
+                shade: [0.1,'#fff']
+            });
+            
             // 测试连接
             $.ajax({
                 url: '/api/ssh/connect',
@@ -445,19 +457,28 @@
                 contentType: 'application/json',
                 data: JSON.stringify(server),
                 success: function(res) {
-                    if (res.code === 200) {
+                    layer.close(loadingIndex);
+                    if (res.success) {
                         isConnected = true;
-                        currentServer.id = res.data.serverId; // 保存服务器ID
                         updateConnectionStatus(true, server);
                         loadFileList(currentPath);
                         updateFileOperationButtons();
-                        layer.msg('连接成功');
+                        layer.msg('连接成功', {icon: 1});
                     } else {
-                        layer.msg('连接失败: ' + res.message);
+                        layer.msg('连接失败: ' + (res.message || '未知错误'), {icon: 2});
                     }
                 },
-                error: function() {
-                    layer.msg('连接失败，请检查网络连接');
+                error: function(xhr, status, error) {
+                    layer.close(loadingIndex);
+                    let errorMsg = '连接失败';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg += ': ' + xhr.responseJSON.message;
+                    } else if (xhr.status === 0) {
+                        errorMsg += ': 网络连接失败';
+                    } else {
+                        errorMsg += ': ' + error;
+                    }
+                    layer.msg(errorMsg, {icon: 2});
                 }
             });
         }
@@ -498,24 +519,41 @@
                 return;
             }
             
+            // 显示加载状态
+            $('#file-list').html('<div style="text-align: center; color: #999; padding: 20px 0;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 加载中...</div>');
+            
             $.ajax({
                 url: '/api/ssh/files',
-                type: 'GET',
-                data: {
-                    serverId: currentServer.id,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    host: currentServer.host,
+                    port: currentServer.port,
+                    username: currentServer.username,
+                    password: currentServer.password,
                     path: path
-                },
+                }),
                 success: function(res) {
-                    if (res.code === 200) {
+                    if (res.success) {
                         renderFileList(res.data);
                         updateBreadcrumb(path);
                         currentPath = path;
                     } else {
-                        layer.msg('加载文件列表失败: ' + res.message);
+                        $('#file-list').html('<div style="text-align: center; color: #ff5722; padding: 20px 0;">加载失败: ' + (res.message || '未知错误') + '</div>');
+                        layer.msg('加载文件列表失败: ' + (res.message || '未知错误'), {icon: 2});
                     }
                 },
-                error: function() {
-                    layer.msg('加载文件列表失败，请检查网络连接');
+                error: function(xhr, status, error) {
+                    let errorMsg = '加载文件列表失败';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg += ': ' + xhr.responseJSON.message;
+                    } else if (xhr.status === 0) {
+                        errorMsg += ': 网络连接失败';
+                    } else {
+                        errorMsg += ': ' + error;
+                    }
+                    $('#file-list').html('<div style="text-align: center; color: #ff5722; padding: 20px 0;">' + errorMsg + '</div>');
+                    layer.msg(errorMsg, {icon: 2});
                 }
             });
         }
@@ -536,13 +574,19 @@
                 const size = isDir ? '-' : formatFileSize(file.size);
                 
                 const fileItem = $(`
-                    <div class="file-item" data-path="${file.path}" data-type="${file.type}">
+                    <div class="file-item" data-path="${file.path}" data-type="${file.type}" data-name="${file.name}">
                         <div class="file-icon">
                             <i class="layui-icon ${icon}"></i>
                         </div>
                         <div class="file-name">${file.name}</div>
                         <div class="file-size">${size}</div>
                         <div class="file-time">${file.modifyTime}</div>
+                        <div class="file-actions" style="margin-left: auto;">
+                            <button class="layui-btn layui-btn-xs layui-btn-danger delete-file-btn" title="删除"><i class="layui-icon layui-icon-delete"></i></button>
+                            <button class="layui-btn layui-btn-xs layui-btn-normal rename-file-btn" title="重命名"><i class="layui-icon layui-icon-edit"></i></button>
+                            ${file.type === 'file' ? '<button class="layui-btn layui-btn-xs download-file-btn" title="下载"><i class="layui-icon layui-icon-download-circle"></i></button>' : ''}
+                            ${file.type === 'file' ? '<button class="layui-btn layui-btn-xs layui-btn-warm view-file-btn" title="查看"><i class="layui-icon layui-icon-file"></i></button>' : ''}
+                        </div>
                     </div>
                 `);
                 
@@ -550,7 +594,12 @@
             });
             
             // 绑定文件项点击事件
-            $('.file-item').on('click', function() {
+            $('.file-item').on('click', function(e) {
+                // 如果点击的是操作按钮，不触发文件夹进入事件
+                if ($(e.target).closest('.file-actions').length > 0) {
+                    return;
+                }
+                
                 const path = $(this).data('path');
                 const type = $(this).data('type');
                 
@@ -560,6 +609,39 @@
                     // 处理文件点击（可以添加下载或预览功能）
                     layer.msg('文件: ' + path);
                 }
+            });
+            
+            // 绑定删除按钮事件
+            $('.delete-file-btn').on('click', function(e) {
+                e.stopPropagation();
+                const $fileItem = $(this).closest('.file-item');
+                const fileName = $fileItem.data('name');
+                const fileType = $fileItem.data('type');
+                deleteFile(fileName, fileType);
+            });
+            
+            // 绑定重命名按钮事件
+            $('.rename-file-btn').on('click', function(e) {
+                e.stopPropagation();
+                const $fileItem = $(this).closest('.file-item');
+                const fileName = $fileItem.data('name');
+                renameFile(fileName);
+            });
+            
+            // 绑定下载按钮事件
+            $('.download-file-btn').on('click', function(e) {
+                e.stopPropagation();
+                const $fileItem = $(this).closest('.file-item');
+                const fileName = $fileItem.data('name');
+                downloadFile(fileName);
+            });
+            
+            // 绑定查看按钮事件
+            $('.view-file-btn').on('click', function(e) {
+                e.stopPropagation();
+                const $fileItem = $(this).closest('.file-item');
+                const fileName = $fileItem.data('name');
+                viewFile(fileName);
             });
         }
         
@@ -610,31 +692,43 @@
         
         $('#upload-btn').on('click', function(){
             if(!isConnected){
-                layer.msg('请先连接服务器');
+                layer.msg('请先连接服务器', {icon: 0});
                 return;
             }
             
             layer.open({
                 type: 1,
                 title: '上传文件',
-                content: '<div id="upload-area" style="padding: 20px; text-align: center; border: 2px dashed #ccc; margin: 10px;">点击或拖拽文件到此处上传</div>',
-                area: ['400px', '200px'],
+                content: '<div id="upload-area" style="padding: 20px; text-align: center; border: 2px dashed #ccc; margin: 10px; border-radius: 4px;"><i class="layui-icon layui-icon-upload" style="font-size: 30px; color: #ccc;"></i><br><br>点击或拖拽文件到此处上传</div>',
+                area: ['450px', '250px'],
                 success: function(layero, index){
                     upload.render({
                         elem: '#upload-area',
                         url: '/api/ssh/upload',
+                        method: 'POST',
                         data: {
-                            serverId: currentServer.id,
-                            path: currentPath
+                            host: currentServer.host,
+                            port: currentServer.port,
+                            username: currentServer.username,
+                            password: currentServer.password,
+                            remotePath: currentPath
+                        },
+                        before: function(obj){
+                            layer.load(1);
                         },
                         done: function(res){
-                            if(res.code === 200){
-                                layer.msg('上传成功');
+                            layer.closeAll('loading');
+                            if(res.success){
+                                layer.msg('上传成功', {icon: 1});
                                 layer.close(index);
                                 loadFileList(currentPath);
                             } else {
-                                layer.msg('上传失败: ' + res.message);
+                                layer.msg('上传失败: ' + (res.message || '未知错误'), {icon: 2});
                             }
+                        },
+                        error: function(){
+                            layer.closeAll('loading');
+                            layer.msg('上传失败，请检查网络连接', {icon: 2});
                         }
                     });
                 }
@@ -643,50 +737,128 @@
         
         $('#mkdir-btn').on('click', function(){
             if(!isConnected){
-                layer.msg('请先连接服务器');
+                layer.msg('请先连接服务器', {icon: 0});
                 return;
             }
             
             layer.prompt({
                 title: '新建文件夹',
-                formType: 0
+                formType: 0,
+                value: '',
+                maxlength: 255
             }, function(value, index){
-                if(value){
+                if(value && value.trim()){
+                    const folderName = value.trim();
+                    
+                    // 验证文件夹名称
+                    if(/[\\/:*?"<>|]/.test(folderName)){
+                        layer.msg('文件夹名称不能包含特殊字符 \\ / : * ? " < > |', {icon: 2});
+                        return;
+                    }
+                    
+                    const loadingIndex = layer.load(1);
+                    
                     $.ajax({
                         url: '/api/ssh/mkdir',
                         type: 'POST',
-                        data: {
-                            serverId: currentServer.id,
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            host: currentServer.host,
+                            port: currentServer.port,
+                            username: currentServer.username,
+                            password: currentServer.password,
                             path: currentPath,
-                            name: value
-                        },
+                            name: folderName
+                        }),
                         success: function(res){
-                            if(res.code === 200){
-                                layer.msg('创建成功');
+                            layer.close(loadingIndex);
+                            if(res.success){
+                                layer.msg('创建成功', {icon: 1});
                                 layer.close(index);
                                 loadFileList(currentPath);
                             } else {
-                                layer.msg('创建失败: ' + res.message);
+                                layer.msg('创建失败: ' + (res.message || '未知错误'), {icon: 2});
                             }
                         },
-                        error: function(){
-                            layer.msg('创建失败，请检查网络连接');
+                        error: function(xhr, status, error){
+                            layer.close(loadingIndex);
+                            let errorMsg = '创建失败';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMsg += ': ' + xhr.responseJSON.message;
+                            } else if (xhr.status === 0) {
+                                errorMsg += ': 网络连接失败';
+                            } else {
+                                errorMsg += ': ' + error;
+                            }
+                            layer.msg(errorMsg, {icon: 2});
                         }
                     });
+                } else {
+                    layer.msg('请输入文件夹名称', {icon: 0});
                 }
             });
         });
         
         $('#disconnect-file-btn').on('click', function(){
-            if(isConnected){
-                isConnected = false;
-                currentServer = null;
-                currentPath = '/';
-                updateConnectionStatus(false);
-                $('#file-list').html('<div style="text-align: center; color: #999; padding: 50px 0;">请先连接到服务器</div>');
-                updateFileOperationButtons();
-                layer.msg('已断开连接');
+            if(!isConnected){
+                layer.msg('当前未连接任何服务器', {icon: 0});
+                return;
             }
+            
+            layer.confirm('确定要断开与服务器 "' + currentServer.host + ':' + currentServer.port + '" 的连接吗？', {
+                icon: 3,
+                title: '确认断开',
+                btn: ['确定', '取消']
+            }, function(index){
+                const loadingIndex = layer.load(1);
+                
+                $.ajax({
+                    url: '/api/ssh/disconnect',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        host: currentServer.host,
+                        port: currentServer.port,
+                        username: currentServer.username
+                    }),
+                    success: function(res){
+                        layer.close(loadingIndex);
+                        if(res.success){
+                            layer.msg('断开连接成功', {icon: 1});
+                            isConnected = false;
+                            currentServer = null;
+                            currentPath = '';
+                            updateConnectionStatus();
+                            $('#file-list').empty();
+                            $('#breadcrumb').empty();
+                            
+                            // 显示连接提示
+                            $('#file-list').html('<div style="text-align: center; padding: 50px; color: #999;"><i class="layui-icon layui-icon-unlink" style="font-size: 48px;"></i><br><br>请先连接到服务器</div>');
+                            
+                            // 关闭WebSocket连接
+                            if (window.terminalWebSocket) {
+                                window.terminalWebSocket.close();
+                                window.terminalWebSocket = null;
+                            }
+                        } else {
+                            layer.msg('断开连接失败: ' + (res.message || '未知错误'), {icon: 2});
+                        }
+                    },
+                    error: function(xhr, status, error){
+                        layer.close(loadingIndex);
+                        let errorMsg = '断开连接失败';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg += ': ' + xhr.responseJSON.message;
+                        } else if (xhr.status === 0) {
+                            errorMsg += ': 网络连接失败';
+                        } else {
+                            errorMsg += ': ' + error;
+                        }
+                        layer.msg(errorMsg, {icon: 2});
+                    }
+                });
+                layer.close(index);
+            });
         });
 
         // 终端区域事件处理
@@ -893,6 +1065,204 @@
         // 初始化完成后的处理
         function initComplete() {
             console.log('文件管理模块初始化完成');
+        }
+        
+        // 删除文件或文件夹
+        function deleteFile(fileName, fileType) {
+            const fileTypeText = fileType === 'directory' ? '文件夹' : '文件';
+            layer.confirm('确定要删除' + fileTypeText + ' "' + fileName + '" 吗？', {
+                icon: 3,
+                title: '确认删除',
+                btn: ['确定', '取消']
+            }, function(index) {
+                const loadingIndex = layer.load(1);
+                
+                $.ajax({
+                    url: '/api/ssh/delete',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        host: currentServer.host,
+                        port: currentServer.port,
+                        username: currentServer.username,
+                        password: currentServer.password,
+                        path: currentPath + '/' + fileName
+                    }),
+                    success: function(res) {
+                        layer.close(loadingIndex);
+                        if(res.success) {
+                            layer.msg('删除成功', {icon: 1});
+                            loadFileList(currentPath);
+                        } else {
+                            layer.msg('删除失败: ' + (res.message || '未知错误'), {icon: 2});
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        layer.close(loadingIndex);
+                        let errorMsg = '删除失败';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg += ': ' + xhr.responseJSON.message;
+                        } else if (xhr.status === 0) {
+                            errorMsg += ': 网络连接失败';
+                        } else {
+                            errorMsg += ': ' + error;
+                        }
+                        layer.msg(errorMsg, {icon: 2});
+                    }
+                });
+                layer.close(index);
+            });
+        }
+        
+        // 重命名文件或文件夹
+        function renameFile(fileName) {
+            layer.prompt({
+                title: '重命名',
+                formType: 0,
+                value: fileName,
+                maxlength: 255
+            }, function(value, index) {
+                if(value && value.trim() && value.trim() !== fileName) {
+                    const newName = value.trim();
+                    
+                    // 验证文件名
+                    if(/[\\/:*?"<>|]/.test(newName)){
+                        layer.msg('文件名不能包含特殊字符 \\ / : * ? " < > |', {icon: 2});
+                        return;
+                    }
+                    
+                    const loadingIndex = layer.load(1);
+                    
+                    $.ajax({
+                        url: '/api/ssh/rename',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            host: currentServer.host,
+                            port: currentServer.port,
+                            username: currentServer.username,
+                            password: currentServer.password,
+                            oldPath: currentPath + '/' + fileName,
+                            newPath: currentPath + '/' + newName
+                        }),
+                        success: function(res) {
+                            layer.close(loadingIndex);
+                            if(res.success) {
+                                layer.msg('重命名成功', {icon: 1});
+                                loadFileList(currentPath);
+                            } else {
+                                layer.msg('重命名失败: ' + (res.message || '未知错误'), {icon: 2});
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            layer.close(loadingIndex);
+                            let errorMsg = '重命名失败';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMsg += ': ' + xhr.responseJSON.message;
+                            } else if (xhr.status === 0) {
+                                errorMsg += ': 网络连接失败';
+                            } else {
+                                errorMsg += ': ' + error;
+                            }
+                            layer.msg(errorMsg, {icon: 2});
+                        }
+                    });
+                    layer.close(index);
+                } else if(value && value.trim() === fileName) {
+                    layer.msg('文件名未更改', {icon: 0});
+                    layer.close(index);
+                } else {
+                    layer.msg('请输入有效的文件名', {icon: 0});
+                }
+            });
+        }
+        
+        // 下载文件
+        function downloadFile(fileName) {
+            if(!isConnected || !currentServer) {
+                layer.msg('请先连接服务器', {icon: 0});
+                return;
+            }
+            
+            const loadingIndex = layer.load(1, {
+                shade: [0.1,'#fff']
+            });
+            
+            // 构造下载URL
+            const downloadUrl = '/api/ssh/download?' + $.param({
+                host: currentServer.host,
+                port: currentServer.port,
+                username: currentServer.username,
+                password: currentServer.password,
+                path: currentPath + '/' + fileName
+            });
+            
+            // 创建隐藏的下载链接
+            const $downloadLink = $('<a>');
+            $downloadLink.attr('href', downloadUrl);
+            $downloadLink.attr('download', fileName);
+            $downloadLink.css('display', 'none');
+            $('body').append($downloadLink);
+            
+            // 触发下载
+            $downloadLink[0].click();
+            
+            // 清理
+            setTimeout(() => {
+                $downloadLink.remove();
+                layer.close(loadingIndex);
+            }, 1000);
+            
+            layer.msg('开始下载文件: ' + fileName, {icon: 1});
+        }
+        
+        // 查看文件内容
+        function viewFile(fileName) {
+            if(!isConnected || !currentServer) {
+                layer.msg('请先连接服务器', {icon: 0});
+                return;
+            }
+            
+            const loadingIndex = layer.load(1);
+            
+            $.ajax({
+                url: '/api/ssh/view',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    host: currentServer.host,
+                    port: currentServer.port,
+                    username: currentServer.username,
+                    password: currentServer.password,
+                    path: currentPath + '/' + fileName
+                }),
+                success: function(res) {
+                    layer.close(loadingIndex);
+                    if(res.success) {
+                        layer.open({
+                            type: 1,
+                            title: '查看文件: ' + fileName,
+                            content: '<div style="padding: 15px;"><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">' + $('<div>').text(res.data).html() + '</pre></div>',
+                            area: ['80%', '70%'],
+                            maxmin: true
+                        });
+                    } else {
+                        layer.msg('查看文件失败: ' + (res.message || '未知错误'), {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error) {
+                    layer.close(loadingIndex);
+                    let errorMsg = '查看文件失败';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg += ': ' + xhr.responseJSON.message;
+                    } else if (xhr.status === 0) {
+                        errorMsg += ': 网络连接失败';
+                    } else {
+                        errorMsg += ': ' + error;
+                    }
+                    layer.msg(errorMsg, {icon: 2});
+                }
+            });
         }
         
         // 调用初始化

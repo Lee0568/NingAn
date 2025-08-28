@@ -1,169 +1,1066 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>监控大屏 - 地图模式</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NingAn 蜜罐监控大屏</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #000;
-            color: #fff;
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #0c1022 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+            gap: 15px;
+            padding: 15px;
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
             padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(64, 158, 255, 0.3);
         }
-        #main {
-            width: 100vw;
-            height: 90vh; /* 地图容器 */
+        
+        .header h1 {
+            font-size: 2.5em;
+            color: #409eff;
+            text-shadow: 0 0 20px rgba(64, 158, 255, 0.5);
+            margin-bottom: 10px;
         }
-        #continent-switcher {
+        
+        .header .subtitle {
+            font-size: 1.2em;
+            color: #a0a0a0;
+        }
+        
+        .left-panel, .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(64, 158, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(64, 158, 255, 0.3);
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #409eff;
+            text-shadow: 0 0 10px rgba(64, 158, 255, 0.5);
+        }
+        
+        .stat-label {
+            font-size: 1em;
+            color: #a0a0a0;
+            margin-top: 10px;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid rgba(64, 158, 255, 0.3);
+            flex: 1;
+        }
+        
+        .chart-title {
+            font-size: 1.3em;
+            color: #409eff;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .map-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid rgba(64, 158, 255, 0.3);
+            position: relative;
+        }
+        
+        .map-controls {
             text-align: center;
             margin-bottom: 20px;
         }
-        #continent-switcher button {
-            background-color: #337ab7;
+        
+        .map-controls button {
+            background: linear-gradient(45deg, #409eff, #66b3ff);
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 25px;
             margin: 0 10px;
             cursor: pointer;
-            border-radius: 5px;
-            font-size: 16px;
+            border-radius: 25px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(64, 158, 255, 0.3);
         }
-        #continent-switcher button:hover {
-            background-color: #286090;
+        
+        .map-controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(64, 158, 255, 0.4);
+        }
+        
+        .map-controls button.active {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+        }
+        
+        #main {
+            width: 100%;
+            height: calc(100% - 80px);
+        }
+        
+        .footer {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(64, 158, 255, 0.3);
+            color: #a0a0a0;
+        }
+        
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #409eff;
+            font-size: 1.2em;
+        }
+        
+        .spinner {
+            border: 3px solid rgba(64, 158, 255, 0.3);
+            border-top: 3px solid #409eff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 1400px) {
+            .dashboard-container {
+                grid-template-columns: 1fr 1.5fr 1fr;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto auto auto;
+            }
+            .left-panel, .right-panel {
+                flex-direction: row;
+                gap: 15px;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+                margin-bottom: 0;
+            }
+            .chart-container {
+                flex: 1;
+                min-height: 300px;
+            }
+            .map-container {
+                height: 400px;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            .header .subtitle {
+                font-size: 1rem;
+            }
+            .chart-container {
+                min-height: 280px;
+            }
+            .map-container {
+                height: 350px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 10px;
+                gap: 10px;
+            }
+            .header {
+                padding: 15px;
+            }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            .left-panel, .right-panel {
+                flex-direction: column;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .stat-card {
+                padding: 15px;
+            }
+            .stat-value {
+                font-size: 2rem;
+            }
+            .chart-container {
+                padding: 15px;
+                min-height: 250px;
+            }
+            .map-container {
+                height: 300px;
+                padding: 15px;
+            }
+            .map-controls button {
+                padding: 8px 15px;
+                margin: 0 5px;
+                font-size: 12px;
+            }
+            .footer {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .dashboard-container {
+                padding: 8px;
+                gap: 8px;
+            }
+            .header {
+                padding: 10px;
+            }
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            .header .subtitle {
+                font-size: 0.9rem;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .stat-card {
+                padding: 12px;
+            }
+            .stat-value {
+                font-size: 1.8rem;
+            }
+            .stat-label {
+                font-size: 0.9rem;
+            }
+            .chart-container {
+                padding: 12px;
+                min-height: 200px;
+            }
+            .chart-title {
+                font-size: 1.1rem;
+            }
+            .map-container {
+                height: 250px;
+                padding: 12px;
+            }
+            .map-controls {
+                margin-bottom: 15px;
+            }
+            .map-controls button {
+                padding: 6px 12px;
+                margin: 0 3px;
+                font-size: 11px;
+            }
+            .threat-legend {
+                display: none !important;
+            }
+            .footer {
+                padding: 8px;
+                font-size: 0.8rem;
+            }
+            .log-item {
+                padding: 8px;
+                font-size: 0.8rem;
+            }
+        }
+        
+        .log-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid #409eff;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        
+        .log-time {
+            color: #66b3ff;
+            font-weight: bold;
+        }
+        
+        .log-ip {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        
+        .log-type {
+            color: #ffa500;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-
-<div id="continent-switcher">
-    <button onclick="switchContinent('world')">世界</button>
-    <button onclick="switchContinent('china')">中国</button>
-    <button onclick="switchContinent('europe')">欧洲</button>
-</div>
-
-<div id="main"></div>
+    <div class="dashboard-container">
+        <!-- 头部标题 -->
+        <div class="header">
+            <h1>NingAn 蜜罐监控大屏</h1>
+            <div class="subtitle">实时威胁监控与攻击分析系统</div>
+        </div>
+        
+        <!-- 左侧面板 -->
+        <div class="left-panel">
+            <!-- 统计卡片 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalAttacks">0</div>
+                    <div class="stat-label">总攻击次数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uniqueIps">0</div>
+                    <div class="stat-label">攻击IP数量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="attackTypes">0</div>
+                    <div class="stat-label">攻击类型</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="todayAttacks">0</div>
+                    <div class="stat-label">今日攻击</div>
+                </div>
+            </div>
+            
+            <!-- 攻击类型饼图 -->
+            <div class="chart-container">
+                <div class="chart-title">攻击类型分布</div>
+                <div id="attackTypePie" style="width: 100%; height: 300px;"></div>
+            </div>
+        </div>
+        
+        <!-- 中间地图区域 -->
+        <div class="map-container">
+            <div class="map-controls">
+                <button onclick="switchMapView('world')" class="active" id="worldBtn">世界视图</button>
+                <button onclick="switchMapView('china')" id="chinaBtn">中国地图</button>
+                <button onclick="switchMapView('satellite')" id="satelliteBtn">卫星地图</button>
+            </div>
+            <div class="threat-legend" style="position: absolute; top: 80px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; border: 1px solid rgba(64, 158, 255, 0.3);">
+                <div style="color: #fff; font-size: 14px; margin-bottom: 10px; font-weight: bold;">威胁等级</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; background: #52c41a; border-radius: 50%; box-shadow: 0 0 8px #52c41a;"></div>
+                        <span style="color: #fff; font-size: 12px;">低威胁 (1次)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; background: #faad14; border-radius: 50%; box-shadow: 0 0 8px #faad14;"></div>
+                        <span style="color: #fff; font-size: 12px;">中等威胁 (2-4次)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; background: #ff7a45; border-radius: 50%; box-shadow: 0 0 8px #ff7a45;"></div>
+                        <span style="color: #fff; font-size: 12px;">高威胁 (5-9次)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; background: #ff4d4f; border-radius: 50%; box-shadow: 0 0 8px #ff4d4f;"></div>
+                        <span style="color: #fff; font-size: 12px;">严重威胁 (≥10次)</span>
+                    </div>
+                </div>
+            </div>
+            <div id="amapContainer" style="width: 100%; height: calc(100% - 80px);"></div>
+            <div class="loading" id="mapLoading">
+                <div class="spinner"></div>
+                <div>加载地图数据中...</div>
+            </div>
+        </div>
+        
+        <!-- 右侧面板 -->
+        <div class="right-panel">
+            <!-- 攻击趋势图 -->
+            <div class="chart-container">
+                <div class="chart-title">7天攻击趋势</div>
+                <div id="attackTrend" style="width: 100%; height: 250px;"></div>
+            </div>
+            
+            <!-- 实时日志 -->
+            <div class="chart-container">
+                <div class="chart-title">实时攻击日志</div>
+                <div id="realtimeLogs" style="height: 300px; overflow-y: auto;">
+                    <!-- 实时日志将在这里显示 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部信息 -->
+        <div class="footer">
+            <span>NingAn 蜜罐系统 v2.0 | 最后更新时间: <span id="lastUpdate">--</span> | 
+                <span id="connectionStatus" style="display: inline-flex; align-items: center; gap: 5px;">
+                    <div id="statusIndicator" style="width: 8px; height: 8px; border-radius: 50%; background: #52c41a; box-shadow: 0 0 8px #52c41a;"></div>
+                    <span id="statusText">在线监控中</span>
+                </span>
+            </span>
+        </div>
+    </div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/world.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/china.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/europe.js"></script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=dfbfa7ba5a79cc90cd70394dd81b6be9"></script>
 
 <script>
-    const chartDom = document.getElementById('main');
-    const myChart = echarts.init(chartDom, 'dark');
+    let amapInstance, attackTypePieChart, attackTrendChart;
+    let currentMapView = 'world';
+    let attackData = [];
+    let dashboardStats = {};
+    let attackMarkers = [];
 
-    // 自定义闪烁的散点样式
-    const flashingSeriesStyle = {
-        name: '攻击IP',
-        type: 'scatter',
-        coordinateSystem: 'geo',
-        symbolSize: 10,
-        itemStyle: {
-            color: 'red'
-        },
-        label: {
-            show: false
-        },
-        tooltip: {
-            formatter: '{b}'
-        },
-        rippleEffect: {
-            period: 2,
-            scale: 4,
-            brushType: 'stroke'
-        },
-        data: []
-    };
+    // 初始化所有图表
+    function initCharts() {
+        initMap();
+        initAttackTypePie();
+        initAttackTrend();
+        loadAllData();
+    }
 
-    // 我们预先加载了地图文件，所以这里只需要设置ECharts的注册地图
-    // 确保你引入了对应的JS文件
+    // 初始化高德地图
+    function initMap() {
+        amapInstance = new AMap.Map('amapContainer', {
+            zoom: 2,
+            center: [104.066, 30.572], // 成都坐标作为中心点
+            mapStyle: 'amap://styles/dark', // 暗色主题
+            viewMode: '3D',
+            pitch: 0,
+            rotation: 0,
+            showLabel: true,
+            features: ['bg', 'road', 'building', 'point']
+        });
+        
+        // 暂时移除控件，避免API兼容性问题
+        // 地图基本功能（缩放、拖拽等）仍然可用
+    }
 
-    /**
-     * 获取并更新地图上的攻击IP标记
-     * @param {string} mapName - 地图名称（例如：'world', 'china', 'europe'）
-     */
-    async function fetchAndRenderIPs(mapName) {
-        try {
-            // 1. 调用后端API获取IP列表
-            const response = await fetch('http://127.0.0.1:65535/api/logs/analyze');
-            const data = await response.json();
+    // 初始化攻击类型饼图
+    function initAttackTypePie() {
+        const chartDom = document.getElementById('attackTypePie');
+        attackTypePieChart = echarts.init(chartDom);
+    }
 
-            const attackIPs = data.map(item => item.ip);
-            const seriesData = [];
+    // 初始化攻击趋势图
+    function initAttackTrend() {
+        const chartDom = document.getElementById('attackTrend');
+        attackTrendChart = echarts.init(chartDom);
+    }
 
-            // 2. 遍历IP列表，获取地理位置
-            for (const ip of attackIPs) {
-                try {
-                    const geoResponse = await fetch(`http://ip-api.com/json/${ip}`);
-                    const geoData = await geoResponse.json();
+    // 加载所有数据
+    function loadAllData() {
+        showLoading();
+        Promise.all([
+            loadDashboardStats(),
+            loadAttackIpData(),
+            loadAttackTypeStats(),
+            loadAttackTrends()
+        ]).then(() => {
+            hideLoading();
+            updateLastUpdateTime();
+        }).catch(error => {
+            console.error('Error loading data:', error);
+            hideLoading();
+        });
+    }
 
-                    if (geoData.status === 'success') {
-                        const { lat, lon, city, country } = geoData;
-                        seriesData.push({
-                            name: `${ip}<br>${country}, ${city}`,
-                            value: [lon, lat] // ECharts 坐标系要求 [经度, 纬度]
-                        });
-                    }
-                } catch (geoError) {
-                    console.error(`无法获取 IP ${ip} 的地理位置信息:`, geoError);
+    // 加载仪表盘统计数据
+     function loadDashboardStats() {
+         return fetch('http://localhost:65535/api/dashboard/stats')
+             .then(response => response.json())
+             .then(data => {
+                 dashboardStats = data;
+                 updateStatsCards();
+             });
+     }
+ 
+     // 加载攻击IP数据
+     function loadAttackIpData() {
+         return fetch('http://localhost:65535/api/logs/analyze')
+             .then(response => response.json())
+             .then(data => {
+                 attackData = data;
+                 updateMap();
+             });
+     }
+ 
+     // 加载攻击类型统计
+     function loadAttackTypeStats() {
+         return fetch('http://localhost:65535/api/attack/types')
+             .then(response => response.json())
+             .then(data => {
+                 updateAttackTypePie(data);
+             });
+     }
+ 
+     // 加载攻击趋势数据
+     function loadAttackTrends() {
+         return fetch('http://localhost:65535/api/attack/trends')
+             .then(response => response.json())
+             .then(data => {
+                 updateAttackTrend(data);
+             });
+     }
+
+    // 更新统计卡片
+    function updateStatsCards() {
+        document.getElementById('totalAttacks').textContent = dashboardStats.totalAttacks || 0;
+        document.getElementById('uniqueIps').textContent = dashboardStats.uniqueIps || 0;
+        document.getElementById('attackTypes').textContent = dashboardStats.attackTypes || 0;
+        document.getElementById('todayAttacks').textContent = dashboardStats.todayAttacks || 0;
+    }
+
+    // 更新攻击类型饼图
+    function updateAttackTypePie(data) {
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                borderColor: '#00d4ff',
+                textStyle: { color: '#fff' }
+            },
+            series: [{
+                name: '攻击类型',
+                type: 'pie',
+                radius: ['40%', '70%'],
+                center: ['50%', '50%'],
+                data: data,
+                itemStyle: {
+                    borderRadius: 5,
+                    borderColor: '#1a1a1a',
+                    borderWidth: 2
+                },
+                label: {
+                    color: '#fff',
+                    fontSize: 12
+                },
+                labelLine: {
+                    lineStyle: { color: '#fff' }
                 }
-            }
+            }]
+        };
+        attackTypePieChart.setOption(option);
+    }
 
-            // 3. 更新地图配置
-            const option = {
-                tooltip: {
-                    trigger: 'item',
-                    formatter: '{b}'
-                },
-                geo: {
-                    map: mapName, // 使用传入的地图名称
-                    roam: false,
-                    zoom: 1.2,
-                    label: {
-                        show: false,
-                    },
-                    itemStyle: {
-                        areaColor: '#0c223c',
-                        borderColor: '#409eff'
-                    },
-                    emphasis: {
-                        itemStyle: {
-                            areaColor: '#0f3258'
-                        },
+    // 更新攻击趋势图
+    function updateAttackTrend(data) {
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                borderColor: '#00d4ff',
+                textStyle: { color: '#fff' }
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                data: data.dates,
+                axisLine: { lineStyle: { color: '#fff' } },
+                axisLabel: { color: '#fff' }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: { lineStyle: { color: '#fff' } },
+                axisLabel: { color: '#fff' },
+                splitLine: { lineStyle: { color: '#333' } }
+            },
+            series: [{
+                name: '攻击次数',
+                type: 'line',
+                data: data.counts,
+                smooth: true,
+                lineStyle: { color: '#00d4ff', width: 3 },
+                itemStyle: { color: '#00d4ff' },
+                areaStyle: {
+                    color: {
+                        type: 'linear',
+                        x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: 'rgba(0, 212, 255, 0.3)' },
+                            { offset: 1, color: 'rgba(0, 212, 255, 0.1)' }
+                        ]
                     }
-                },
-                series: [{
-                    ...flashingSeriesStyle,
-                    data: seriesData
-                }]
-            };
+                }
+            }]
+        };
+        attackTrendChart.setOption(option);
+    }
 
-            myChart.setOption(option);
-        } catch (apiError) {
-            console.error('调用后端API失败:', apiError);
+    // 更新地图显示
+    function updateMap() {
+        // 清除现有标记
+        clearMapMarkers();
+        
+        const mapData = [];
+        const promises = [];
+        
+        // 统计每个IP的攻击次数
+        const ipCounts = {};
+        attackData.forEach(ip => {
+            ipCounts[ip] = (ipCounts[ip] || 0) + 1;
+        });
+        
+        // 获取唯一IP列表
+        const uniqueIps = [...new Set(attackData)];
+
+        uniqueIps.forEach(ip => {
+            // 为本地IP提供默认位置
+            if (ip === '127.0.0.1' || ip === 'localhost' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+                mapData.push({
+                    name: '本地网络',
+                    position: [116.4074, 39.9042], // 北京坐标作为默认位置
+                    ip: ip,
+                    country: '中国',
+                    city: '北京',
+                    attackCount: ipCounts[ip]
+                });
+                return;
+            }
+            
+            // 使用高德地图的IP定位服务
+            const promise = new Promise((resolve) => {
+                AMap.plugin('AMap.CitySearch', function() {
+                    const citySearch = new AMap.CitySearch();
+                    // 由于高德地图主要服务中国地区，对于国外IP使用备用方案
+                    fetch(`http://ip-api.com/json/${ip}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                mapData.push({
+                                    name: data.city || data.country,
+                                    position: [data.lon, data.lat],
+                                    ip: ip,
+                                    country: data.country,
+                                    city: data.city,
+                                    attackCount: ipCounts[ip]
+                                });
+                            }
+                            resolve();
+                        })
+                        .catch(error => {
+                            console.error(`Error fetching location for IP ${ip}:`, error);
+                            // 如果API调用失败，提供默认位置
+                            mapData.push({
+                                name: '未知位置',
+                                position: [104.066, 30.572], // 成都坐标作为默认位置
+                                ip: ip,
+                                country: '未知',
+                                city: '未知',
+                                attackCount: ipCounts[ip]
+                            });
+                            resolve();
+                        });
+                });
+            });
+            promises.push(promise);
+        });
+
+        Promise.all(promises).then(() => {
+            renderMapMarkers(mapData);
+        });
+    }
+
+    // 清除地图标记
+    function clearMapMarkers() {
+        if (attackMarkers.length > 0) {
+            amapInstance.remove(attackMarkers);
+            attackMarkers = [];
         }
     }
 
-    /**
-     * 切换大洲的函数
-     * @param {string} mapName - 地图名称
-     */
-    function switchContinent(mapName) {
-        myChart.showLoading();
-        fetchAndRenderIPs(mapName);
-        myChart.hideLoading();
+    // 渲染地图标记点
+    function renderMapMarkers(data) {
+        data.forEach(item => {
+            const attackCount = item.attackCount || 1;
+            let threatLevel = 'low';
+            let color = '#52c41a'; // 绿色 - 低威胁
+            let size = 15;
+            
+            if (attackCount >= 10) {
+                threatLevel = 'critical';
+                color = '#ff4d4f'; // 红色 - 严重威胁
+                size = 25;
+            } else if (attackCount >= 5) {
+                threatLevel = 'high';
+                color = '#ff7a45'; // 橙色 - 高威胁
+                size = 20;
+            } else if (attackCount >= 2) {
+                threatLevel = 'medium';
+                color = '#faad14'; // 黄色 - 中等威胁
+                size = 18;
+            }
+            
+            // 创建自定义标记点
+            const marker = new AMap.Marker({
+                position: item.position,
+                title: `${item.ip} - ${item.city}, ${item.country}`,
+                content: `<div style="width: ${size}px; height: ${size}px; background: ${color}; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 ${size/2}px ${color}; opacity: 0.8;"></div>`,
+                offset: new AMap.Pixel(-size/2, -size/2)
+            });
+            
+            // 添加点击事件
+            marker.on('click', function() {
+                const threatLevelText = {
+                    'low': '低威胁',
+                    'medium': '中等威胁', 
+                    'high': '高威胁',
+                    'critical': '严重威胁'
+                };
+                
+                const infoWindow = new AMap.InfoWindow({
+                    content: `
+                        <div style="padding: 10px; color: #333; font-size: 12px;">
+                            <div><strong>IP地址:</strong> ${item.ip}</div>
+                            <div><strong>位置:</strong> ${item.city}, ${item.country}</div>
+                            <div><strong>攻击次数:</strong> ${attackCount}</div>
+                            <div><strong>威胁等级:</strong> <span style="color: ${color}; font-weight: bold;">${threatLevelText[threatLevel]}</span></div>
+                        </div>
+                    `,
+                    offset: new AMap.Pixel(0, -30)
+                });
+                
+                infoWindow.open(amapInstance, item.position);
+            });
+            
+            attackMarkers.push(marker);
+        });
+        
+        // 将标记添加到地图
+        amapInstance.add(attackMarkers);
+        
+        // 自动调整地图视野以包含所有标记点
+        if (attackMarkers.length > 0) {
+            amapInstance.setFitView(attackMarkers, false, [50, 50, 50, 50]);
+        }
     }
 
-    // 初始加载世界地图
-    switchContinent('world');
+    // 切换地图视图
+    function switchMapView(viewType) {
+        currentMapView = viewType;
+        
+        // 更新按钮状态
+        document.querySelectorAll('.map-controls button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.getElementById(viewType + 'Btn').classList.add('active');
+        
+        // 根据视图类型调整地图
+        switch (viewType) {
+            case 'world':
+                amapInstance.setZoom(2);
+                amapInstance.setCenter([104.066, 30.572]);
+                amapInstance.setMapStyle('amap://styles/dark');
+                break;
+            case 'china':
+                amapInstance.setZoom(4);
+                amapInstance.setCenter([104.066, 35.572]);
+                amapInstance.setMapStyle('amap://styles/dark');
+                break;
+            case 'satellite':
+                amapInstance.setMapStyle('amap://styles/satellite');
+                break;
+        }
+        
+        // 重新渲染标记点以适应新视图
+        setTimeout(() => {
+            if (attackMarkers.length > 0) {
+                amapInstance.setFitView(attackMarkers, false, [50, 50, 50, 50]);
+            }
+        }, 500);
+    }
 
-    // 可选：每隔一段时间刷新一次数据，例如每 30 秒
-    setInterval(() => {
-        const currentMapName = myChart.getOption().geo[0].map;
-        fetchAndRenderIPs(currentMapName);
-    }, 3000);
+    // 显示加载动画
+    function showLoading() {
+        document.getElementById('mapLoading').style.display = 'flex';
+    }
+
+    // 隐藏加载动画
+    function hideLoading() {
+        document.getElementById('mapLoading').style.display = 'none';
+    }
+
+    // 更新最后更新时间
+    function updateLastUpdateTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('zh-CN');
+        document.getElementById('lastUpdate').textContent = timeString;
+    }
+
+    // 更新连接状态
+    function updateConnectionStatus(isOnline) {
+        const indicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        
+        if (isOnline) {
+            indicator.style.background = '#52c41a';
+            indicator.style.boxShadow = '0 0 8px #52c41a';
+            statusText.textContent = '在线监控中';
+            statusText.style.color = '#52c41a';
+        } else {
+            indicator.style.background = '#ff4d4f';
+            indicator.style.boxShadow = '0 0 8px #ff4d4f';
+            statusText.textContent = '连接异常';
+            statusText.style.color = '#ff4d4f';
+        }
+    }
+
+    // 检测网络连接状态
+    function checkConnectionStatus() {
+        fetch('http://localhost:65535/api/logs/analyze')
+            .then(response => {
+                if (response.ok) {
+                    updateConnectionStatus(true);
+                } else {
+                    updateConnectionStatus(false);
+                }
+            })
+            .catch(error => {
+                updateConnectionStatus(false);
+            });
+    }
+
+    // 加载实时日志数据
+    function loadRealtimeLogs() {
+        return fetch('http://localhost:65535/api/logs/recent?limit=10')
+            .then(response => response.json())
+            .then(data => {
+                updateRealtimeLogs(data);
+            })
+            .catch(error => {
+                console.error('Error loading realtime logs:', error);
+                // 如果API不存在，使用模拟数据
+                const mockLogs = generateMockLogs();
+                updateRealtimeLogs(mockLogs);
+            });
+    }
+
+    // 生成模拟日志数据
+    function generateMockLogs() {
+        const mockIps = ['192.168.1.100', '10.0.0.50', '172.16.0.25', '203.0.113.10', '198.51.100.5'];
+        const attackTypes = ['SQL注入', 'XSS攻击', '暴力破解', '文件上传', '命令执行'];
+        const logs = [];
+        
+        for (let i = 0; i < 10; i++) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - i * 2);
+            logs.push({
+                time: now.toLocaleTimeString('zh-CN'),
+                ip: mockIps[Math.floor(Math.random() * mockIps.length)],
+                type: attackTypes[Math.floor(Math.random() * attackTypes.length)],
+                url: '/admin/login.php'
+            });
+        }
+        return logs;
+    }
+
+    // 更新实时日志显示
+    function updateRealtimeLogs(logs) {
+        const logsContainer = document.getElementById('realtimeLogs');
+        logsContainer.innerHTML = '';
+        
+        logs.forEach(log => {
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.innerHTML = `
+                <div class="log-time">${log.time}</div>
+                <div>IP: <span class="log-ip">${log.ip}</span></div>
+                <div>类型: <span class="log-type">${log.type}</span></div>
+                <div>目标: ${log.url || 'N/A'}</div>
+            `;
+            logsContainer.appendChild(logItem);
+        });
+    }
+
+    // 增强的数据加载函数
+    function loadAllDataEnhanced() {
+        showLoading();
+        checkConnectionStatus();
+        
+        Promise.all([
+            loadDashboardStats(),
+            loadAttackIpData(),
+            loadAttackTypeStats(),
+            loadAttackTrends(),
+            loadRealtimeLogs()
+        ]).then(() => {
+            hideLoading();
+            updateLastUpdateTime();
+            updateConnectionStatus(true);
+            
+            // 添加数据更新动画效果
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.style.transform = 'scale(1.05)';
+                setTimeout(() => {
+                    card.style.transform = 'scale(1)';
+                }, 200);
+            });
+        }).catch(error => {
+            console.error('Error loading data:', error);
+            hideLoading();
+            updateConnectionStatus(false);
+        });
+    }
+
+    // 页面加载完成后初始化
+    window.addEventListener('load', function() {
+        initCharts();
+        
+        // 初始化连接状态
+        checkConnectionStatus();
+        
+        // 立即加载数据
+        loadAllDataEnhanced();
+        
+        // 初始化响应式布局
+        setTimeout(() => {
+            adjustChartsForScreenSize();
+        }, 1000);
+        
+        // 每15秒刷新一次完整数据
+        setInterval(loadAllDataEnhanced, 15000);
+        
+        // 每5秒刷新一次实时日志
+        setInterval(loadRealtimeLogs, 5000);
+        
+        // 每10秒检测一次连接状态
+        setInterval(checkConnectionStatus, 10000);
+    });
+
+    // 响应式图表调整
+    function adjustChartsForScreenSize() {
+        const screenWidth = window.innerWidth;
+        
+        // 根据屏幕尺寸调整图表配置
+        const isMobile = screenWidth <= 768;
+        const isTablet = screenWidth <= 992 && screenWidth > 768;
+        
+        // 调整饼图配置
+        if (attackTypePieChart) {
+            const option = {
+                legend: {
+                    orient: isMobile ? 'horizontal' : 'vertical',
+                    left: isMobile ? 'center' : 'right',
+                    top: isMobile ? 'bottom' : 'middle',
+                    textStyle: {
+                        fontSize: isMobile ? 10 : 12
+                    }
+                },
+                series: [{
+                    radius: isMobile ? ['30%', '60%'] : ['40%', '70%'],
+                    center: isMobile ? ['50%', '40%'] : ['50%', '50%'],
+                    label: {
+                        fontSize: isMobile ? 10 : 12
+                    }
+                }]
+            };
+            attackTypePieChart.setOption(option, false, true);
+            attackTypePieChart.resize();
+        }
+        
+        // 调整折线图配置
+        if (attackTrendChart) {
+            const option = {
+                grid: {
+                    left: isMobile ? '15%' : '10%',
+                    right: isMobile ? '10%' : '5%',
+                    bottom: isMobile ? '15%' : '10%'
+                },
+                xAxis: {
+                    axisLabel: {
+                        fontSize: isMobile ? 10 : 12,
+                        rotate: isMobile ? 45 : 0
+                    }
+                },
+                yAxis: {
+                    axisLabel: {
+                        fontSize: isMobile ? 10 : 12
+                    }
+                }
+            };
+            attackTrendChart.setOption(option, false, true);
+            attackTrendChart.resize();
+        }
+        
+        // 调整高德地图配置
+        if (amapInstance) {
+            // 高德地图会自动适应容器大小
+            amapInstance.getSize();
+            
+            // 暂时移除控件调整，避免API兼容性问题
+            // 地图基本功能（缩放、拖拽等）仍然可用
+        }
+    }
+    
+    // 窗口大小改变时重新调整图表大小
+    window.addEventListener('resize', function() {
+        // 延迟执行以确保DOM更新完成
+        setTimeout(() => {
+            adjustChartsForScreenSize();
+        }, 100);
+    });
+    
+    // 屏幕方向改变时调整
+    window.addEventListener('orientationchange', function() {
+        setTimeout(() => {
+            adjustChartsForScreenSize();
+        }, 300);
+    });
 </script>
 </body>
 </html>

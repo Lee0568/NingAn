@@ -58,6 +58,101 @@ deepseek:
     key: ${DEEPSEEK_API_KEY:}                     # DeepSeek API 密钥，从环境变量中读取，如果没有则使用空字符串
     url: https://api.deepseek.com/v1/chat/completions # DeepSeek API URL
 
+# --- SSH 文件操作安全配置 ---
+ssh:
+  file:
+    security:
+      # 文件大小限制（字节）
+      max-upload-size: 104857600        # 100MB
+      max-download-size: 104857600      # 100MB  
+      max-preview-size: 1048576         # 1MB
+      
+      # 允许的文件扩展名（为空表示允许所有类型）
+      allowed-extensions: 
+        - txt
+        - log
+        - md
+        - json
+        - xml
+        - html
+        - css
+        - js
+        - java
+        - py
+        - cpp
+        - c
+        - h
+        - php
+        - sql
+        - yml
+        - yaml
+        - properties
+        - conf
+        - cfg
+        - ini
+        - zip
+        - tar
+        - gz
+        - pdf
+        - doc
+        - docx
+        - xls
+        - xlsx
+        - ppt
+        - pptx
+        - png
+        - jpg
+        - jpeg
+        - gif
+        - bmp
+        - svg
+        
+      # 禁止的文件扩展名
+      blocked-extensions:
+        - exe
+        - bat
+        - cmd
+        - com
+        - scr
+        - pif
+        - vbs
+        - js
+        - jar
+        - sh
+        - bin
+        - run
+        - app
+        - deb
+        - rpm
+        - dmg
+        - pkg
+        - msi
+        - dll
+        - so
+        - dylib
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    net.thekingofduck.loki: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: WARN
+    com.jcraft.jsch: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/loki.log
+    max-size: 10MB
+    max-history: 30
+    total-size-cap: 1GB
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 1GB
+
 templates:
   list:
     default:

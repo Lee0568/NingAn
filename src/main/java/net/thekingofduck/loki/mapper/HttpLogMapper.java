@@ -132,4 +132,12 @@ public interface HttpLogMapper {
      */
     @Select("select * from httplog where canvasId = #{canvasId}")
     public List<HttpLogEntity> getAllInfoByCanvasId(String canvasId);
+
+    /**
+     * 获取最近的日志记录
+     * @param limit 限制返回的记录数
+     * @return 最近的日志记录列表
+     */
+    @Select("SELECT * FROM httplog ORDER BY id DESC LIMIT #{limit}")
+    List<HttpLogEntity> getRecentLogs(@Param("limit") Integer limit);
 }
