@@ -407,7 +407,7 @@
 </div>
 
 <script>
-    let myChart = null;
+    let myChart = null; // 将图表实例提升为全局变量
     let currentCanvasId = null;
     const DEEPSEEK_API_URL = 'http://localhost:65535/api/v2/AIReport';
     const BASIC_DATA_API_URL = 'http://localhost:65535/api/logs/basehackerimg';
@@ -456,8 +456,66 @@
         }
     }
 
-    // 渲染右侧面板数据（报告）
+    // ⭐ [优化] 初始化活跃时段图表
+    function initializeChart() {
+        const ctx = document.getElementById('active-time-chart').getContext('2d');
+        if (!ctx) {
+            console.error("无法找到 active-time-chart canvas 元素。");
+            return;
+        }
+        // 如果已经存在图表实例，先销毁，防止重复创建
+        if (myChart) {
+            myChart.destroy();
+        }
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // 初始化为空
+                datasets: [{
+                    label: '攻击次数',
+                    data: [], // 初始化为空
+                    borderColor: '#00ff00',
+                    backgroundColor: 'rgba(0, 255, 0, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#00ffff',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // 允许图表填充容器
+                scales: {
+                    x: {
+                        ticks: { color: '#00ff00' },
+                        grid: { color: '#333' },
+                        title: { display: true, text: '时间 (24小时制)', color: '#00ff00' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#00ff00' },
+                        grid: { color: '#333' },
+                        title: { display: true, text: '攻击次数', color: '#00ff00' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#333',
+                        titleColor: '#00ff00',
+                        bodyColor: '#00ffff'
+                    }
+                }
+            }
+        });
+    }
+
+    // ⭐ [优化] 渲染右侧面板数据（报告）
     function renderReportPanel(data) {
+        // --- 威胁等级和防御建议的逻辑保持不变 ---
         const threatLevelEl = document.getElementById('threat-level-value');
         threatLevelEl.textContent = data.threatLevel || 'N/A';
         if (threatLevelEl.textContent !== 'N/A') {
@@ -503,53 +561,19 @@
             suggestionsList.appendChild(li);
         }
 
+        // --- 图表更新逻辑 ---
         if (myChart) {
-            myChart.destroy();
+            // 获取新数据，如果数据不存在则使用空数组
+            const newLabels = data.activeTimeData?.labels || [];
+            const newData = data.activeTimeData?.data || [];
+
+            // 更新图表的数据
+            myChart.data.labels = newLabels;
+            myChart.data.datasets[0].data = newData;
+
+            // 调用 update 方法重绘图表
+            myChart.update();
         }
-        const ctx = document.getElementById('active-time-chart').getContext('2d');
-        myChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.activeTimeData?.labels || [],
-                datasets: [{
-                    label: '攻击次数',
-                    data: data.activeTimeData?.data || [],
-                    borderColor: '#00ff00',
-                    backgroundColor: 'rgba(0, 255, 0, 0.2)',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#00ffff',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        ticks: { color: '#00ff00' },
-                        grid: { color: '#333' },
-                        title: { display: true, text: '时间 (24小时制)', color: '#00ff00' }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        ticks: { color: '#00ff00' },
-                        grid: { color: '#333' },
-                        title: { display: true, text: '攻击次数', color: '#00ff00' }
-                    }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: '#333',
-                        titleColor: '#00ff00',
-                        bodyColor: '#00ffff'
-                    }
-                }
-            }
-        });
     }
 
     // 生成报告的函数，由按钮点击触发
@@ -559,9 +583,7 @@
             return;
         }
 
-        // 获取加载动画元素
         const loadingOverlay = document.getElementById('loading-overlay');
-        // 显示加载动画
         loadingOverlay.classList.add('show');
 
         const apiUrl = `${DEEPSEEK_API_URL}?canvasId=${currentCanvasId}`;
@@ -577,20 +599,19 @@
         } catch (error) {
             console.error('获取报告数据失败:', error);
             document.getElementById('threat-level-value').textContent = 'N/A';
-
-            // 失败时，重置 SVG 进度条到初始状态
             const progressFill = document.querySelector('.circular-progress-fill');
             const circumference = 2 * Math.PI * 45;
             progressFill.style.strokeDashoffset = circumference;
             progressFill.style.stroke = '#444';
 
+            // 如果获取失败，清空图表数据
             if (myChart) {
-                myChart.destroy();
-                myChart = null;
+                myChart.data.labels = [];
+                myChart.data.datasets[0].data = [];
+                myChart.update();
             }
             document.getElementById('defense-suggestions-list').innerHTML = '';
         } finally {
-            // 无论成功或失败，都隐藏加载动画
             loadingOverlay.classList.remove('show');
         }
     };
@@ -633,7 +654,6 @@
     };
 
     // 新增：自动消失的提示框函数
-    // 默认消失时间已修改为 2000 毫秒（2秒）
     function showMessage(message, duration = 1500) {
         const messageContainer = document.getElementById('message-container');
         const messageBox = document.getElementById('message-box');
@@ -653,7 +673,6 @@
 
     // 封装通用的请求函数，只传递 canvasId
     const sendIpAction = async (actionUrl) => {
-        // 获取 canvasId（浏览器指纹）
         const canvasId = document.getElementById('fingerprint-value').textContent;
 
         if (!canvasId || canvasId === 'N/A') {
@@ -661,7 +680,6 @@
             return;
         }
 
-        // 创建 URLSearchParams 对象来构建请求体，只包含 canvasId
         const params = new URLSearchParams();
         params.append('canvasId', canvasId);
 
@@ -671,7 +689,7 @@
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: params.toString() // 将参数对象转为字符串
+                body: params.toString()
             });
 
             if (response.ok) {
@@ -690,6 +708,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         loadBasicData();
+        initializeChart(); // ⭐ 在页面加载后立即初始化图表
 
         const generateReportBtn = document.getElementById('generate-report');
         const banIpBtn = document.getElementById('ban-ip');
@@ -699,7 +718,6 @@
             generateReportBtn.addEventListener('click', generateReport);
         }
 
-        // 为 IP 封禁/解封按钮添加事件监听器
         if (banIpBtn) {
             banIpBtn.addEventListener('click', () => sendIpAction(BAN_IP_API_URL));
         }

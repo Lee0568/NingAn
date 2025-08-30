@@ -2,6 +2,7 @@ package net.thekingofduck.loki.controller;
 
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import net.thekingofduck.loki.entity.CanvasEnity;
 import net.thekingofduck.loki.entity.CommandEnity;
 import net.thekingofduck.loki.entity.HttpLogEntity;
@@ -16,6 +17,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletRequest; // 导入 HttpServletRequest
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,12 +88,39 @@ public class ApiController {
      * 该接口实际功能为记录攻击者信息并插入数据库，因为接口名称可查，故以userInfo命名，防止攻击者识别出蜜罐
      */
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
-
     @PostMapping("/httplog/userInfo")
-    public String recordHttpLog(@RequestBody HttpLogEntity httpLogEntity,HttpServletRequest request) {
+    public String recordHttpLog(@RequestBody HttpLogEntity httpLogEntity, HttpServletRequest request) {
         // 1. 获取客户端IP地址
         String clientIp = getClientIp(request);
         httpLogEntity.setIp(clientIp); // 将获取到的IP设置到 HttpLogEntity 对象中
+
+        // ====================== 新增代码开始 ======================
+
+        // 假设 HttpLogEntity 中获取原始时间字符串的方法是 getTime()
+        String utcTimeString = httpLogEntity.getTime();
+
+        // 1. 解析UTC时间字符串为一个时间点 (Instant)
+        Instant instant = Instant.parse(utcTimeString);
+
+        // 2. 定义目标时区 (这里使用 "Asia/Shanghai" 代表 UTC+8)
+        ZoneId targetZone = ZoneId.of("Asia/Shanghai");
+
+        // 3. 将UTC时间点转换为目标时区的时间
+        ZonedDateTime zonedDateTime = instant.atZone(targetZone);
+
+        // 4. 定义你想要的输出格式
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        // 5. 将时间格式化为最终的字符串
+        String formattedTime = zonedDateTime.format(formatter);
+
+        // 6. 将格式化后的时间设置回实体对象中，准备存入数据库
+        // 假设 HttpLogEntity 中设置时间的方法是 setTime()
+        httpLogEntity.setTime(formattedTime);
+
+        // ====================== 新增代码结束 ======================
+
+
         Integer rows1 = userService.insertHttpLog(httpLogEntity);
 
 
@@ -96,15 +128,15 @@ public class ApiController {
         String canvasId = httpLogEntity.getCanvasId();
         Integer rows2 = httpLogMapper.updateCanvasId(canvasId);
 
-        if (httpLogMapper.getCanvasIdCount(canvasId)>0){
+        if (httpLogMapper.getCanvasIdCount(canvasId) > 0) {
             System.out.println("ok");
-        }else{
+        } else {
             Integer rows3 = httpLogMapper.addCanvasId(canvasId);
         }
 
         String username = httpLogEntity.getUsername();
         String password = httpLogEntity.getPassword();
-        if(username.equals("admin")&&password.equals("123456")) {
+        if (username.equals("admin") && password.equals("123456")) {
             return "success";
         }
 
@@ -139,7 +171,7 @@ public class ApiController {
 // --- 关键修改：添加 produces = "text/plain;charset=UTF-8" ---
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
     @GetMapping(value = "/v2/AIReport", produces = "text/plain;charset=UTF-8")
-    public String chat(@RequestParam String canvasId) {
+    public String chat(@RequestParam String canvasId) throws JsonProcessingException {
         // 调用 DeepSeekService 获取 DeepSeek API 的解析后的中文回复
         String aiResponse = deepSeekService.analyzeAndCallDeepSeek(canvasId);
         return aiResponse;
