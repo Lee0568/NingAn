@@ -6,7 +6,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import net.thekingofduck.loki.entity.CanvasEnity;
 import net.thekingofduck.loki.entity.CommandEnity;
 import net.thekingofduck.loki.entity.HttpLogEntity;
+import net.thekingofduck.loki.entity.UserInfoEnity;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
+import net.thekingofduck.loki.mapper.UserInfoMapper;
 import net.thekingofduck.loki.model.ResultViewModelUtil;
 import net.thekingofduck.loki.service.AuthService;
 import net.thekingofduck.loki.service.DeepSeekService;
@@ -16,11 +18,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import javax.servlet.http.HttpServletRequest; // 导入 HttpServletRequest
+import java.text.SimpleDateFormat;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +48,8 @@ public class ApiController {
     @SuppressWarnings("all")
     @Autowired
     HttpLogMapper httpLogMapper;
+    @Autowired
+    UserInfoMapper userInfoMapper;
 
 
     @RequestMapping(value="/httplog/get", produces="application/json;charset=UTF-8")
@@ -201,6 +208,99 @@ public class ApiController {
         // 返回 JSON 格式的响应
         return ResponseEntity.ok(responseData);
     }
+
+    /**
+     * 根据ID更新员工信息
+     * @param id  从URL路径中获取的要修改的员工ID
+     * @param userInfoToUpdate 从请求体中获取的包含更新信息的JSON对象
+     * @return 返回包含操作结果的JSON对象
+     */
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @PutMapping("userInfo/update/{id}")
+    public Map<String, Object> updateEmployeeInfo(@PathVariable int id, @RequestBody UserInfoEnity userInfoToUpdate) { // <--- 这里已修改
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // 建议使用接收对象作为参数的Mapper方法
+            userInfoToUpdate.setId(id); // 确保ID被设置
+            int affectedRows = userInfoMapper.updateUserInfo(userInfoToUpdate); // <--- Mapper方法也应使用 UserInfoEnity
+
+            if (affectedRows > 0) {
+                response.put("success", true);
+                response.put("message", "员工信息更新成功！");
+            } else {
+                response.put("success", false);
+                response.put("message", "更新失败：未找到ID为 " + id + " 的用户。");
+            }
+        } catch (Exception e) {
+            // ... 错误处理
+        }
+        return response;
+    }
+
+    /**
+     * 根据ID删除员工信息
+     * @param id 从URL路径中动态获取的员工ID
+     * @return 返回一个包含操作结果的JSON对象
+     */
+    @DeleteMapping("userInfo/del/{id}")
+    public Map<String, Object> deleteUser(@PathVariable int id) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // 调用我们之前在Mapper中定义好的 deleteUserById 方法
+            int affectedRows = userInfoMapper.deleteUserById(id);
+
+            // 检查受影响的行数来判断是否真的删除了记录
+            if (affectedRows > 0) {
+                response.put("success", true);
+                response.put("message", "员工信息删除成功！");
+            } else {
+                response.put("success", false);
+                response.put("message", "删除失败：未在数据库中找到ID为 " + id + " 的员工。");
+            }
+        } catch (Exception e) {
+            // 捕获可能发生的数据库异常或其他错误
+            response.put("success", false);
+            response.put("message", "删除失败，服务器发生错误：" + e.getMessage());
+            // 在实际开发中，这里应该记录详细的错误日志
+            // e.printStackTrace();
+        }
+
+        return response;
+    }
+
+    /**
+     * 新增员工信息
+     * @param userInfo
+     * @return
+     */
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @PostMapping("userInfo/add")
+    public Map<String, Object> addUser(@RequestBody UserInfoEnity userInfo) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // 由后端设置注册日期
+            userInfo.setRegDate(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+
+            // 调用Mapper执行插入
+            userInfoMapper.addUser(userInfo);
+
+            // 成功后，userInfo对象已包含数据库生成的ID
+            response.put("success", true);
+            response.put("message", "员工添加成功！");
+            response.put("data", userInfo);
+
+        } catch (DuplicateKeyException e) {
+            response.put("success", false);
+            response.put("message", "添加失败：用户名或邮箱已存在。");
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "添加失败，服务器发生未知错误。");
+        }
+        return response;
+    }
+
     public static class HomeInfo {
         public String title;
         public String href;

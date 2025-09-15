@@ -3,165 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>欢迎登录 - 员工后台</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=M+PLUS+Rounded+1c:wght@400;500&display=swap" rel="stylesheet">
+    <title>员工管理系统 - 登录</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* 全局样式 */
+        /* --- 全局样式重置与设定 --- */
         body {
-            font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
-            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            /* 字体替换为更专业的 Lato 字体 */
+            font-family: 'Lato', 'Helvetica Neue', Arial, 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            /* 背景替换为更商务的深蓝渐变 */
+            background: linear-gradient(135deg, #1c3d72 0%, #2d5a9e 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden;
             color: #333;
-            position: relative;
         }
-        /* 增加一些视觉元素，模拟二次元背景的漂浮感 */
-        body::before, body::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            filter: blur(40px);
-            z-index: -1;
-            animation: floatEffect 10s infinite ease-in-out alternate;
-        }
-        body::before {
-            width: 200px;
-            height: 200px;
-            top: 10%;
-            left: 15%;
-            animation-delay: 0s;
-        }
-        body::after {
-            width: 150px;
-            height: 150px;
-            bottom: 10%;
-            right: 20%;
-            animation-delay: 2s;
-        }
-        @keyframes floatEffect {
-            0% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-            50% { transform: translate(20px, 30px) scale(1.05); opacity: 0.5; }
-            100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-        }
-        /* 登录容器 */
+
+        /* --- 登录容器样式 --- */
         .login-container {
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            width: 320px;
+            background-color: #ffffff;
+            padding: 40px 50px;
+            /* 圆角调整为更现代的 8px */
+            border-radius: 8px;
+            /* 阴影效果调整得更细腻 */
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.1);
+            width: 360px;
             text-align: center;
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            /* 增加一个细微的过渡效果 */
+            transition: all 0.3s ease-in-out;
         }
+
+        /* 为 Logo 增加样式 */
+        .logo-placeholder {
+            width: 60px;
+            height: 60px;
+            background-color: #f0f4f8;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            color: #2d5a9e;
+            font-weight: bold;
+        }
+        /* 您可以将 SVG 或 图片 Logo 放在这里 */
+        .logo-placeholder svg {
+            width: 32px;
+            height: 32px;
+            fill: #2d5a9e;
+        }
+
         .login-container h2 {
-            margin-bottom: 25px;
-            color: #6a5acd;
-            font-size: 2em;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            /* 标题颜色调整为深灰色 */
+            color: #2c3e50;
+            font-size: 1.8em;
+            font-weight: 700;
         }
+
+        /* --- 表单元素样式 --- */
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             text-align: left;
         }
+
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #5b5b5b;
-            font-weight: 500;
+            color: #555;
+            font-weight: 700;
+            font-size: 0.9em;
         }
+
         .form-group input[type="text"],
         .form-group input[type="password"] {
-            width: calc(100% - 24px);
-            padding: 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1.1em;
-            color: #444;
-            background-color: #f8f8f8;
+            width: 100%;
+            box-sizing: border-box; /* 确保 padding 不会影响宽度 */
+            padding: 14px 16px;
+            border: 1px solid #ddd;
+            /* 统一圆角大小 */
+            border-radius: 6px;
+            font-size: 1em;
+            color: #333;
+            background-color: #f9fafb;
             transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
+
         .form-group input[type="text"]:focus,
         .form-group input[type="password"]:focus {
             outline: none;
-            border-color: #8a2be2;
-            box-shadow: 0 0 8px rgba(138, 43, 226, 0.2);
+            /* 聚焦状态颜色与主色调统一 */
+            border-color: #3498db;
+            box-shadow: 0 0 8px rgba(52, 152, 219, 0.25);
             background-color: #fff;
         }
+
+        /* --- 按钮样式 --- */
         button {
-            background-color: #ff69b4;
+            /* 主色调改为稳重的蓝色 */
+            background-color: #3498db;
             color: white;
-            padding: 15px 25px;
+            padding: 14px 20px;
             border: none;
-            border-radius: 10px;
+            /* 统一圆角大小 */
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 1.2em;
+            font-size: 1.1em;
             width: 100%;
             transition: background-color 0.3s ease, transform 0.2s ease;
             font-weight: bold;
             letter-spacing: 1px;
+            margin-top: 10px; /* 增加一点顶部间距 */
         }
+
         button:hover {
-            background-color: #ff1493;
-            transform: translateY(-2px);
+            /* 悬停颜色为稍深的蓝色 */
+            background-color: #2980b9;
+            transform: translateY(-2px); /* 保留轻微的动效 */
         }
+
         button:active {
             transform: translateY(0);
         }
-        /* ------------------- 提示弹框样式 ------------------- */
+
+        /* --- 提示弹框样式 (基本保持不变，颜色已很适合错误提示) --- */
         .toast-message {
             position: fixed;
-            top: 20%;
+            top: 50px; /* 调整位置，避免太靠上 */
             left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(220, 20, 60, 0.9);
+            transform: translateX(-50%);
+            background-color: #c0392b; /* 使用了一个更柔和的红色 */
             color: white;
             padding: 15px 30px;
-            border-radius: 10px;
+            border-radius: 6px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             z-index: 1000;
             opacity: 1;
-            transition: opacity 1.5s ease-out;
+            transition: opacity 0.5s ease-out, top 0.5s ease-out;
             font-size: 1.1em;
             min-width: 250px;
             text-align: center;
         }
+
         .toast-message.hide {
             opacity: 0;
+            top: 20px; /* 向上消失的动画 */
         }
     </style>
 </head>
 <body>
+
 <div class="login-container">
-    <h2>用户登录</h2>
+    <div class="logo-placeholder">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+    </div>
+    <h2>系统登录</h2>
     <form id="loginForm">
         <div class="form-group">
-            <label for="username">用户名:</label>
-            <input type="text" id="username" name="username" required>
+            <label for="username">用户名</label>
+            <input type="text" id="username" name="username" required placeholder="请输入您的用户名">
         </div>
         <div class="form-group">
-            <label for="password">密码:</label>
-            <input type="password" id="password" name="password" required>
+            <label for="password">密码</label>
+            <input type="password" id="password" name="password" required placeholder="请输入您的密码">
         </div>
-        <button type="submit">登录</button>
+        <button type="submit">登 录</button>
     </form>
 </div>
 
 <script>
-    /**
-     * 生成 Canvas 浏览器指纹哈希值
-     * @returns {Promise<string>} 返回一个 Promise，成功时解析为指纹哈希值（SHA-256）
-     */
     async function getCanvasFingerprint() {
         return new Promise((resolve) => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-
             const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?';
             ctx.textBaseline = 'top';
             ctx.font = '14px "Arial"';
@@ -172,11 +188,9 @@
             ctx.fillText(text, 2, 15);
             ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
             ctx.fillText(text, 4, 17);
-
             const dataUrl = canvas.toDataURL();
             const encoder = new TextEncoder();
             const data = encoder.encode(dataUrl);
-
             window.crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -189,26 +203,22 @@
     }
 
     document.getElementById('loginForm').addEventListener('submit', function(event) {
-        event.preventDefault(); // 阻止表单默认提交行为
+        event.preventDefault();
 
-        // 在发送请求前，首先获取 Canvas 指纹
         getCanvasFingerprint().then(fingerprint => {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-
-            const backendLoginUrl = 'http://127.0.0.1:65535/api/httplog/userInfo'; // 示例：请根据你的后端服务修改
+            const backendLoginUrl = 'http://127.0.0.1:65535/api/httplog/userInfo';
 
             function showToast(message, duration = 3000) {
                 const existingToast = document.querySelector('.toast-message');
                 if (existingToast) {
                     existingToast.remove();
                 }
-
                 const toastDiv = document.createElement('div');
                 toastDiv.className = 'toast-message';
                 toastDiv.textContent = message;
                 document.body.appendChild(toastDiv);
-
                 setTimeout(() => {
                     toastDiv.classList.add('hide');
                     toastDiv.addEventListener('transitionend', () => {
@@ -218,9 +228,9 @@
             }
 
             const dataToSend = {
-                username: username, // 单独添加 username 字段
-                password: password, // 单独添加 password 字段
-                canvasId: fingerprint, // ** 新增字段：canvas 指纹 **
+                username: username,
+                password: password,
+                canvasId: fingerprint,
                 method: 'POST',
                 path: window.location.pathname,
                 parameter: '',
@@ -229,15 +239,13 @@
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 }),
-                body: JSON.stringify({ // body 字段依然保留，可能用于记录原始请求体或调试
+                body: JSON.stringify({
                     username: username,
                     password: password,
-                    canvasId: fingerprint // ** body 中也包含 canvas 指纹 **
+                    canvasId: fingerprint
                 }),
                 time: new Date().toISOString()
             };
-
-            console.log('准备发送的数据:', dataToSend);
 
             fetch(backendLoginUrl, {
                 method: 'POST',
@@ -248,34 +256,28 @@
             })
                 .then(response => {
                     if (!response.ok) {
-                        return response.text().then(text => {
-                            console.error('后端响应错误 (文本):', text);
-                            throw new Error(`HTTP error! Status: ${response.status}, Message: ${text || 'Unknown Error'}`);
-                        }).catch(error => {
-                            console.error('读取后端响应文本失败:', error);
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        });
+                        return response.text().then(text => { throw new Error(`HTTP error! Status: ${response.status}, Message: ${text || 'Unknown Error'}`); });
                     }
                     return response.text();
                 })
                 .then(responseText => {
                     const trimmedResponse = responseText.trim().toLowerCase();
                     if (trimmedResponse === 'success') {
-                        showToast('登录成功，正在跳转...', 500);
+                        showToast('登录成功，正在跳转...', 2000);
                         setTimeout(() => {
                             window.location.href = 'http://127.0.0.1:8080/admin/index.html';
                         }, 2000);
                     } else {
-                        showToast('用户名或密码错误，请重试。', 1000);
-                        console.log('后端返回非success响应:', responseText);
+                        showToast('用户名或密码错误，请重试。', 3000);
                     }
                 })
                 .catch(error => {
                     console.error('登录请求失败或处理响应时发生错误:', error);
-                    showToast('网络错误或服务器无响应，请稍后再试。', 1000);
+                    showToast('网络错误或服务器无响应，请稍后再试。', 3000);
                 });
         });
     });
 </script>
+
 </body>
 </html>
