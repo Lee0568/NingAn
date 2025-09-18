@@ -154,10 +154,11 @@ public class ApiController {
     public Map<String, Object> getUserList(
             @RequestParam(value = "page", defaultValue = "1") Integer page, // 从URL查询参数获取page，默认值1
             @RequestParam(value = "limit", defaultValue = "10") Integer limit, // 从URL查询参数获取limit，默认值10
-            @RequestParam(value = "query", required = false) String query) { // 从URL查询参数获取query，非必需
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "canvasId", required = true) String canvasId) { // 从URL查询参数获取query，非必需
 
         // 调用 Service 层的方法，并将 query 参数传递进去
-        return userService.getUserInfoPaged(page, limit, query);
+        return userService.getUserInfoPaged(page, limit, query, canvasId);
     }
 
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
@@ -217,12 +218,18 @@ public class ApiController {
      */
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
     @PutMapping("userInfo/update/{id}")
-    public Map<String, Object> updateEmployeeInfo(@PathVariable int id, @RequestBody UserInfoEnity userInfoToUpdate) { // <--- 这里已修改
+    public Map<String, Object> updateEmployeeInfo(
+            @PathVariable int id,
+            @RequestBody UserInfoEnity userInfoToUpdate) {
+
+        // 从传入的请求体对象中获取 canvasId
+        String canvasId = userInfoToUpdate.getCanvasId();
+
         Map<String, Object> response = new HashMap<>();
         try {
-            // 建议使用接收对象作为参数的Mapper方法
+            // 核心业务：更新用户信息
             userInfoToUpdate.setId(id); // 确保ID被设置
-            int affectedRows = userInfoMapper.updateUserInfo(userInfoToUpdate); // <--- Mapper方法也应使用 UserInfoEnity
+            int affectedRows = userInfoMapper.updateUserInfo(userInfoToUpdate);
 
             if (affectedRows > 0) {
                 response.put("success", true);
@@ -232,8 +239,31 @@ public class ApiController {
                 response.put("message", "更新失败：未找到ID为 " + id + " 的用户。");
             }
         } catch (Exception e) {
-            // ... 错误处理
+            response.put("success", false);
+            response.put("message", "更新用户信息时发生错误: " + e.getMessage());
+            // 建议在这里就返回，避免后续逻辑在主业务失败时还继续执行
+            return response;
         }
+
+        // 附属业务：处理 canvasId
+        // 1. 更新最新一条日志的 canvasId 字段
+        if (canvasId != null && !canvasId.trim().isEmpty()) {
+            try {
+                httpLogMapper.updateCanvasIdForLastHttpLog(canvasId);
+                System.out.println("成功更新最新日志的 canvasId: " + canvasId);
+            } catch (Exception e) {
+                // 在实际项目中，这里应该使用日志框架记录错误
+                System.err.println("更新最新日志的 canvasId 时发生错误: " + e.getMessage());
+            }
+        }
+
+        // 2. 检查 canvasId 是否重复，不重复则添加
+        if (httpLogMapper.getCanvasIdCount(canvasId) != 0) {
+            System.out.println("已存在重复canvasId记录");
+        } else {
+            httpLogMapper.addCanvasId(canvasId);
+        }
+
         return response;
     }
 
@@ -243,14 +273,16 @@ public class ApiController {
      * @return 返回一个包含操作结果的JSON对象
      */
     @DeleteMapping("userInfo/del/{id}")
-    public Map<String, Object> deleteUser(@PathVariable int id) {
+    public Map<String, Object> deleteUser(
+            @PathVariable int id,
+            @RequestParam("canvasId") String canvasId) {
+
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // 调用我们之前在Mapper中定义好的 deleteUserById 方法
+            // 核心业务：删除用户
             int affectedRows = userInfoMapper.deleteUserById(id);
 
-            // 检查受影响的行数来判断是否真的删除了记录
             if (affectedRows > 0) {
                 response.put("success", true);
                 response.put("message", "员工信息删除成功！");
@@ -259,11 +291,27 @@ public class ApiController {
                 response.put("message", "删除失败：未在数据库中找到ID为 " + id + " 的员工。");
             }
         } catch (Exception e) {
-            // 捕获可能发生的数据库异常或其他错误
             response.put("success", false);
             response.put("message", "删除失败，服务器发生错误：" + e.getMessage());
-            // 在实际开发中，这里应该记录详细的错误日志
-            // e.printStackTrace();
+            return response;
+        }
+
+        // 附属业务：处理 canvasId (这部分逻辑保持不变)
+        // 1. 更新最新一条日志的 canvasId 字段
+        if (canvasId != null && !canvasId.trim().isEmpty()) {
+            try {
+                httpLogMapper.updateCanvasIdForLastHttpLog(canvasId);
+                System.out.println("成功更新最新日志的 canvasId: " + canvasId);
+            } catch (Exception e) {
+                System.err.println("更新最新日志的 canvasId 时发生错误: " + e.getMessage());
+            }
+        }
+
+        // 2. 检查 canvasId 是否重复，不重复则添加
+        if (httpLogMapper.getCanvasIdCount(canvasId) != 0) {
+            System.out.println("已存在重复canvasId记录");
+        } else {
+            httpLogMapper.addCanvasId(canvasId);
         }
 
         return response;
@@ -277,27 +325,50 @@ public class ApiController {
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
     @PostMapping("userInfo/add")
     public Map<String, Object> addUser(@RequestBody UserInfoEnity userInfo) {
+        // 从传入的请求体对象中获取 canvasId
+        String canvasId = userInfo.getCanvasId();
+
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // 由后端设置注册日期
+            // 核心业务：新增员工
             userInfo.setRegDate(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
-
-            // 调用Mapper执行插入
             userInfoMapper.addUser(userInfo);
 
-            // 成功后，userInfo对象已包含数据库生成的ID
             response.put("success", true);
             response.put("message", "员工添加成功！");
-            response.put("data", userInfo);
+            response.put("data", userInfo); // 返回包含新生成ID的用户信息
 
         } catch (DuplicateKeyException e) {
             response.put("success", false);
             response.put("message", "添加失败：用户名或邮箱已存在。");
+            // 添加失败时直接返回，不执行后续 canvasId 操作
+            return response;
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "添加失败，服务器发生未知错误。");
+            // 添加失败时直接返回
+            return response;
         }
+
+        // 附属业务：处理 canvasId (仅在主业务成功后执行)
+        // 1. 更新最新一条日志的 canvasId 字段
+        if (canvasId != null && !canvasId.trim().isEmpty()) {
+            try {
+                httpLogMapper.updateCanvasIdForLastHttpLog(canvasId);
+                System.out.println("成功更新最新日志的 canvasId: " + canvasId);
+            } catch (Exception e) {
+                System.err.println("更新最新日志的 canvasId 时发生错误: " + e.getMessage());
+            }
+        }
+
+        // 2. 检查 canvasId 是否重复，不重复则添加
+        if (httpLogMapper.getCanvasIdCount(canvasId) != 0) {
+            System.out.println("已存在重复canvasId记录");
+        } else {
+            httpLogMapper.addCanvasId(canvasId);
+        }
+
         return response;
     }
 

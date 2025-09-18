@@ -140,4 +140,12 @@ public interface HttpLogMapper {
      */
     @Select("SELECT * FROM httplog ORDER BY id DESC LIMIT #{limit}")
     List<HttpLogEntity> getRecentLogs(@Param("limit") Integer limit);
+
+    /**
+     * 更新 httplog 表中最新一条记录的 canvasId 字段。
+     * @param canvasId 要设置的 canvasId 值
+     * @return 返回受影响的行数，成功则为 1
+     */
+    @Update("UPDATE `main`.`httplog` SET `canvasId` = #{canvasId} WHERE id = (SELECT MAX(id) FROM `main`.`httplog`)")
+    Integer updateCanvasIdForLastHttpLog(@Param("canvasId") String canvasId);
 }

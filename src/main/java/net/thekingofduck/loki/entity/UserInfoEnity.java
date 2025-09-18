@@ -15,5 +15,5 @@ public class UserInfoEnity {
     private String email;
     private String role;
     private String regDate; // 注册日期通常由后端生成
-
+    private String canvasId;
 }

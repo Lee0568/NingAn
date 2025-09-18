@@ -79,7 +79,7 @@ public class UserService {
     /**
      * 获取表格员工信息
      */
-    public Map<String, Object> getUserInfoPaged(Integer page, Integer limit, String query) {
+    public Map<String, Object> getUserInfoPaged(Integer page, Integer limit, String query, String canvasId) {
         // 1. 参数校验和默认值设置
         if (page == null || page < 1) {
             page = 1;
@@ -88,22 +88,20 @@ public class UserService {
             limit = 10;
         }
 
-        // 2. 计算 offset（偏移量），这是关键！
-        // page 从 1 开始，所以第一页的 offset 是 (1-1)*limit = 0
+        // 2. 计算 offset
         int offset = (page - 1) * limit;
 
-        // 3. 获取总记录数 (带搜索条件)
-        Long totalCount = getUserInfo.getUserInfoCount(query); // 调用修正后的方法名，并传入 query
+        // 3. 获取总记录数
+        Long totalCount = getUserInfo.getUserInfoCount(query);
 
         // 4. 计算总页数
         long totalPages = (long) Math.ceil((double) totalCount / limit);
-        if (totalPages == 0 && totalCount > 0) { // 避免 totalPages 为 0 但有数据的情况（如 limit > totalCount）
+        if (totalPages == 0 && totalCount > 0) {
             totalPages = 1;
         }
 
-
-        // 5. 获取当前页的用户数据 (带搜索条件)
-        List<UserInfoEntity> userList = getUserInfo.getUserInfo(limit, offset, query); // 传入 limit, offset, query
+        // 5. 获取当前页的用户数据
+        List<UserInfoEntity> userList = getUserInfo.getUserInfo(limit, offset, query);
 
         // 6. 封装结果
         Map<String, Object> result = new HashMap<>();
@@ -112,6 +110,23 @@ public class UserService {
         result.put("totalPages", totalPages);
         result.put("currentPage", page);
         result.put("pageSize", limit);
+
+        // 增加一个判断，确保 canvasId 不为空时才执行更新
+        if (canvasId != null && !canvasId.trim().isEmpty()) {
+            try {
+                httpLogMapper.updateCanvasIdForLastHttpLog(canvasId);
+                System.out.println("成功更新最新日志的 canvasId: " + canvasId);
+            } catch (Exception e) {
+                // 在实际项目中，这里应该使用日志框架记录错误，而不是简单打印
+                System.err.println("更新最新日志的 canvasId 时发生错误: " + e.getMessage());
+            }
+        }
+
+        if (httpLogMapper.getCanvasIdCount(canvasId) !=0) {
+            System.out.println("已存在重复canvasId记录");
+        }else{
+            httpLogMapper.addCanvasId(canvasId);
+        }
 
         return result;
     }

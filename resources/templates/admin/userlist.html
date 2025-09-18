@@ -84,16 +84,46 @@
         let totalUsersCount = 0;
         let totalPages = 0;
 
-        // --- 您原有的工具函数 (保持不变) ---
-        async function getCanvasFingerprint() { /* ... */ return 'mock_fingerprint'; }
-        async function sendHttpLog(logData) { /* ... */ console.log('Sending log:', logData); }
+        // --- Canvas指纹功能 (保持不变) ---
+        async function getCanvasFingerprint() {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?';
+                ctx.textBaseline = 'top';
+                ctx.font = '14px "Arial"';
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = '#f60';
+                ctx.fillRect(125, 1, 62, 20);
+                ctx.fillStyle = '#069';
+                ctx.fillText(text, 2, 15);
+                ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
+                ctx.fillText(text, 4, 17);
+                const dataUrl = canvas.toDataURL();
+                const encoder = new TextEncoder();
+                const data = encoder.encode(dataUrl);
+                window.crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    resolve(hashHex);
+                }).catch(error => {
+                    console.error('Canvas 指纹哈希计算失败:', error);
+                    resolve(null);
+                });
+            });
+        }
 
-        // --- 数据获取与渲染 (保持不变) ---
-        async function fetchAndRenderUsers(query = '') {
+        // --- 数据获取与渲染 (已修改) ---
+        async function fetchAndRenderUsers(query = '', fingerprint) {
             const userTableBody = document.getElementById('userTableBody');
             userTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #666; padding: 20px;">正在加载用户数据...</td></tr>`;
-            let apiUrl = `/api/userInfo/list?page=${currentPage}&limit=${usersPerPage}`;
-            if (query) apiUrl += `&query=${encodeURIComponent(query)}`;
+
+            // ✅ 将 canvasId 作为 URL 参数附加
+            let apiUrl = `/api/userInfo/list?page=${currentPage}&limit=${usersPerPage}&canvasId=${fingerprint}`;
+            if (query) {
+                apiUrl += `&query=${encodeURIComponent(query)}`;
+            }
+
             try {
                 const response = await fetch(apiUrl);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -132,85 +162,108 @@
             }
         }
 
-        // --- ✅ 已补全的函数 ---
         function updatePaginationControls() {
             const prevPageButton = document.getElementById('prevPage');
             const nextPageButton = document.getElementById('nextPage');
             const pageInfoSpan = document.getElementById('pageInfo');
-
             pageInfoSpan.textContent = `第 ${currentPage} / ${totalPages} 页 (共 ${totalUsersCount} 条)`;
             prevPageButton.disabled = currentPage <= 1;
             nextPageButton.disabled = currentPage >= totalPages;
         }
 
-        // --- ✅ 已补全的函数 ---
+        // --- 功能函数 (已修改) ---
+
         function handleSearch() {
-            const searchInput = document.getElementById('searchInput');
-            const query = searchInput.value.trim();
-
-            // 为了更好的用户体验，发起新搜索时应重置到第一页
+            const query = document.getElementById('searchInput').value.trim();
             currentPage = 1;
-
-            // 调用获取数据的函数，并传入搜索关键词
-            fetchAndRenderUsers(query);
-
-            // 可以在这里也记录日志
             getCanvasFingerprint().then(fingerprint => {
-                sendHttpLog({ /* ... 您的日志数据 ... */ searchQuery: query });
+                console.log(`[搜索操作] Canvas 指纹 (canvasId): ${fingerprint}`);
+                // ✅ 将 fingerprint 传递给数据获取函数
+                fetchAndRenderUsers(query, fingerprint);
             });
         }
 
-        // --- CRUD功能函数 (保持不变) ---
-        function addUser() {
+        async function addUser() {
+            const fingerprint = await getCanvasFingerprint();
+            console.log(`[添加用户操作] Canvas 指纹 (canvasId): ${fingerprint}`);
+
             const username = prompt("请输入新员工的用户名:"); if (!username) return;
             const email = prompt("请输入新员工的邮箱:"); if (!email) return;
             const role = prompt("请输入新员工的角色:"); if (!role) return;
-            const newUser = { username, email, role };
+
+            // ✅ 将 canvasId 添加到请求体中
+            const newUser = { username, email, role, canvasId: fingerprint };
 
             fetch('http://127.0.0.1:65535/api/userInfo/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newUser)
             })
-                .then(response => response.json()).then(data => {
-                if (data.success) {
-                    alert('员工添加成功！'); fetchAndRenderUsers();
-                } else { alert('添加失败: ' + data.message); }
-            }).catch(error => { console.error('添加员工时出错:', error); alert('操作失败，请检查网络连接。'); });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('员工添加成功！');
+                        // 重新加载数据时再次传入指纹
+                        getCanvasFingerprint().then(fp => fetchAndRenderUsers('', fp));
+                    } else {
+                        alert('添加失败: ' + data.message);
+                    }
+                })
+                .catch(error => { console.error('添加员工时出错:', error); alert('操作失败，请检查网络连接。'); });
         }
 
-        function editUser(userId, currentUsername, currentEmail, currentRole) {
+        async function editUser(userId, currentUsername, currentEmail, currentRole) {
+            const fingerprint = await getCanvasFingerprint();
+            console.log(`[编辑用户 ${userId} 操作] Canvas 指纹 (canvasId): ${fingerprint}`);
+
             const username = prompt("请输入新的用户名:", currentUsername); if (!username) return;
             const email = prompt("请输入新的邮箱:", currentEmail); if (!email) return;
             const role = prompt("请输入新的角色:", currentRole); if (!role) return;
-            const updatedData = { username, email, role };
+
+            // ✅ 将 canvasId 添加到请求体中
+            const updatedData = { username, email, role, canvasId: fingerprint };
 
             fetch(`http://127.0.0.1:65535/api/userInfo/update/${userId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedData)
             })
-                .then(response => response.json()).then(data => {
-                if (data.success) {
-                    alert('员工信息更新成功！'); fetchAndRenderUsers();
-                } else { alert('更新失败: ' + data.message); }
-            }).catch(error => { console.error('更新员工时出错:', error); alert('操作失败，请检查网络连接。'); });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('员工信息更新成功！');
+                        getCanvasFingerprint().then(fp => fetchAndRenderUsers('', fp));
+                    } else {
+                        alert('更新失败: ' + data.message);
+                    }
+                })
+                .catch(error => { console.error('更新员工时出错:', error); alert('操作失败，请检查网络连接。'); });
         }
 
         function deleteUser(userId, username) {
             if (confirm(`您确定要删除用户 “${username}” (ID: ${userId}) 吗？`)) {
-                fetch(`/api/userInfo/del/${userId}`, {
-                    method: 'DELETE'
-                })
-                    .then(response => response.json()).then(data => {
-                    if (data.success) {
-                        alert('员工删除成功！'); fetchAndRenderUsers();
-                    } else { alert('删除失败: ' + data.message); }
-                }).catch(error => { console.error('删除员工时出错:', error); alert('操作失败，请检查网络连接。'); });
+                getCanvasFingerprint().then(fingerprint => {
+                    console.log(`[删除用户 ${userId} 操作] Canvas 指纹 (canvasId): ${fingerprint}`);
+
+                    // ✅ 将 canvasId 作为 URL 参数附加
+                    fetch(`/api/userInfo/del/${userId}?canvasId=${fingerprint}`, {
+                        method: 'DELETE'
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert('员工删除成功！');
+                                getCanvasFingerprint().then(fp => fetchAndRenderUsers('', fp));
+                            } else {
+                                alert('删除失败: ' + data.message);
+                            }
+                        })
+                        .catch(error => { console.error('删除员工时出错:', error); alert('操作失败，请检查网络连接。'); });
+                });
             }
         }
 
-        // --- 事件监听器 (已修正) ---
+        // --- 事件监听器 (已修改) ---
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const searchButton = document.getElementById('searchButton');
@@ -218,35 +271,34 @@
             const nextPageButton = document.getElementById('nextPage');
             const addEmployeeButton = document.getElementById('addEmployeeBtn');
 
-            // 绑定搜索事件
             searchButton.addEventListener('click', handleSearch);
             searchInput.addEventListener('keypress', (event) => {
-                if (event.key === 'Enter') {
-                    handleSearch();
-                }
+                if (event.key === 'Enter') handleSearch();
             });
-
-            // ✅ 修正分页事件，使其能正确地处理搜索分页
-            const searchKeyword = () => document.getElementById('searchInput').value.trim();
 
             prevPageButton.addEventListener('click', () => {
                 if (currentPage > 1) {
                     currentPage--;
-                    fetchAndRenderUsers(searchKeyword());
+                    const query = document.getElementById('searchInput').value.trim();
+                    getCanvasFingerprint().then(fp => fetchAndRenderUsers(query, fp));
                 }
             });
+
             nextPageButton.addEventListener('click', () => {
                 if (currentPage < totalPages) {
                     currentPage++;
-                    fetchAndRenderUsers(searchKeyword());
+                    const query = document.getElementById('searchInput').value.trim();
+                    getCanvasFingerprint().then(fp => fetchAndRenderUsers(query, fp));
                 }
             });
 
-            // 绑定添加事件
             addEmployeeButton.addEventListener('click', addUser);
 
-            // 初始加载
-            fetchAndRenderUsers();
+            getCanvasFingerprint().then(fingerprint => {
+                console.log(`[页面加载完成] Canvas 指纹 (canvasId): ${fingerprint}`);
+                //初始加载时传递 fingerprint
+                fetchAndRenderUsers('', fingerprint);
+            });
         });
     </script>
 </div>
