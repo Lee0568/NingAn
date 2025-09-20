@@ -7,20 +7,20 @@
     <style>
         body {
             background-color: #1a1a1a;
-            color: #00ff00; /* 绿色文字，模拟终端 */
+            color: #00ff00; 
             font-family: 'Courier New', Courier, monospace;
             padding: 20px;
             margin: 0;
             display: flex;
             flex-direction: column;
             height: 100vh;
-            overflow: hidden; /* 防止页面滚动 */
+            overflow: hidden; 
         }
         #output {
-            flex-grow: 1; /* 占据可用空间 */
-            overflow-y: auto; /* 允许滚动 */
-            white-space: pre-wrap; /* 保留空白和换行 */
-            word-wrap: break-word; /* 自动换行 */
+            flex-grow: 1; 
+            overflow-y: auto; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
             border-bottom: 1px solid #00ff00;
             padding-bottom: 10px;
             margin-bottom: 10px;
@@ -39,20 +39,20 @@
             color: #00ff00;
             font-family: 'Courier New', Courier, monospace;
             font-size: 1em;
-            outline: none; /* 移除选中时的边框 */
-            flex-grow: 1; /* 占据剩余空间 */
-            caret-color: transparent; /* 隐藏原生光标 */
+            outline: none; 
+            flex-grow: 1; 
+            caret-color: transparent; 
         }
 
-        /* 模拟光标 */
+        
         #cursor {
             background-color: #00ff00;
-            width: 8px; /* 光标宽度 */
-            height: 1em; /* 光标高度与文字高度一致 */
+            width: 8px; 
+            height: 1em; 
             display: inline-block;
-            vertical-align: text-bottom; /* 与文字底部对齐 */
+            vertical-align: text-bottom; 
             animation: blink-caret 1s infinite;
-            margin-left: 2px; /* 与文字间隔 */
+            margin-left: 2px; 
         }
 
         @keyframes blink-caret {
@@ -60,10 +60,10 @@
             50% { opacity: 1; }
         }
 
-        /* 隐藏输入框，我们用模拟光标 */
+
         #command-input:focus + #cursor {
-            animation: none; /* 聚焦时停止闪烁 */
-            opacity: 1; /* 聚焦时显示光标 */
+            animation: none; 
+            opacity: 1; 
         }
     </style>
 </head>

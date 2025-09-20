@@ -101,9 +101,6 @@ public class ApiController {
         String clientIp = getClientIp(request);
         httpLogEntity.setIp(clientIp); // 将获取到的IP设置到 HttpLogEntity 对象中
 
-        // ====================== 新增代码开始 ======================
-
-        // 假设 HttpLogEntity 中获取原始时间字符串的方法是 getTime()
         String utcTimeString = httpLogEntity.getTime();
 
         // 1. 解析UTC时间字符串为一个时间点 (Instant)
@@ -115,18 +112,13 @@ public class ApiController {
         // 3. 将UTC时间点转换为目标时区的时间
         ZonedDateTime zonedDateTime = instant.atZone(targetZone);
 
-        // 4. 定义你想要的输出格式
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         // 5. 将时间格式化为最终的字符串
         String formattedTime = zonedDateTime.format(formatter);
 
         // 6. 将格式化后的时间设置回实体对象中，准备存入数据库
-        // 假设 HttpLogEntity 中设置时间的方法是 setTime()
         httpLogEntity.setTime(formattedTime);
-
-        // ====================== 新增代码结束 ======================
-
 
         Integer rows1 = userService.insertHttpLog(httpLogEntity);
 
@@ -176,7 +168,6 @@ public class ApiController {
      * @param canvasId
      * @return
      */
-// --- 关键修改：添加 produces = "text/plain;charset=UTF-8" ---
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
     @GetMapping(value = "/v2/AIReport", produces = "text/plain;charset=UTF-8")
     public String chat(@RequestParam String canvasId) throws JsonProcessingException {
@@ -245,7 +236,6 @@ public class ApiController {
             return response;
         }
 
-        // 附属业务：处理 canvasId
         // 1. 更新最新一条日志的 canvasId 字段
         if (canvasId != null && !canvasId.trim().isEmpty()) {
             try {
@@ -351,7 +341,6 @@ public class ApiController {
             return response;
         }
 
-        // 附属业务：处理 canvasId (仅在主业务成功后执行)
         // 1. 更新最新一条日志的 canvasId 字段
         if (canvasId != null && !canvasId.trim().isEmpty()) {
             try {

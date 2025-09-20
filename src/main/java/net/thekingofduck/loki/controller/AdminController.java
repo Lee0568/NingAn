@@ -22,7 +22,6 @@ import javax.servlet.http.HttpServletResponse;
 @Controller
 public class AdminController {
     
-    // 注入AdminUserService
     @Autowired
     private AdminUserService adminUserService;
 
@@ -33,10 +32,6 @@ public class AdminController {
 
     @RequestMapping(value = "/${loki.adminPath}")
     public String admincheck2(HttpServletRequest request, HttpServletResponse response) {
-
-        //修改为path校验通过后允许访问function的值 如login css之类的值
-
-        //log.info(request.getRequestURI());
 
         if (request.getServerPort() == adminPort){
 

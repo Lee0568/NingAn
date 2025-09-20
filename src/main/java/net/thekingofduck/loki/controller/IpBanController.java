@@ -27,12 +27,8 @@ public class IpBanController {
      */
     @GetMapping
     public ResponseEntity<List<String>> getBannedIps() {
-        // 临时模拟数据，实际应从数据库查询
-        // 假设 ipBanService.getAllBannedIps() 返回一个 IpBanEntity 列表
-        // 然后您可以从中提取 IP 地址
-        List<String> bannedIps = List.of("192.168.1.1", "10.0.0.5"); // 替换为实际从服务获取的数据
+        List<String> bannedIps = List.of("192.168.1.1", "10.0.0.5");
 
-        // 明确设置 Content-Type 为 application/json;charset=UTF-8
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
         return new ResponseEntity<>(bannedIps, headers, HttpStatus.OK);
@@ -49,7 +45,6 @@ public class IpBanController {
         ipBanService.banIp(canvasId);
         String message = "IP " + canvasId + " 已成功封禁.";
 
-        // 明确设置 Content-Type 为 text/plain;charset=UTF-8
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8));
         return new ResponseEntity<>(message, headers, HttpStatus.OK);
@@ -66,7 +61,6 @@ public class IpBanController {
         ipBanService.unbanIp(canvasId);
         String message = "IP " + canvasId + " 已成功解封.";
 
-        // 明确设置 Content-Type 为 text/plain;charset=UTF-8
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8));
         return new ResponseEntity<>(message, headers, HttpStatus.OK);
