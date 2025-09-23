@@ -21,25 +21,35 @@ spring:
     static-path-pattern: /**
 
     #不要为我们工程中的资源文件建立映射
-
-
   web:
     resources:
       add-mappings: false
+
+  # ============================ 数据库配置 ============================
   datasource:
     url: jdbc:sqlite:data/loki.db # 创建的sqlite数据库所在路径
     username: # 因为没有用户名和密码，所以这两个参数就没有值
     password:
     driver-class-name: org.sqlite.JDBC # sqlite驱动
+  # ------------------------------------------------------------------
+  # ============================ JPA & Hibernate 配置 ============================
+  jpa:
+    hibernate:
+      ddl-auto: update # 自动更新数据库表结构（根据实体类），开发环境推荐
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.SQLiteDialect # 显式指定 SQLite 方言，解决启动报错问题
+        show_sql: true # 在控制台打印 SQL 语句，方便调试
+        format_sql: true # 格式化打印的 SQL，使其更易读
+  # ------------------------------------------------------------------
+
   thymeleaf:
     prefix: classpath:/templates/
-
 
 # mybatis配置
 mybatis:
   mapper-locations: classpath:mybatis/mapper/*Mapper.xml # 配置mapper.xml文件路径
   type-aliases-package: net.thekingofduck.loki.entity # 实体类包名
-
 
 loki:
   adminPath: lokiadmin                  #后台路径 http://HOST:ADMINPORT/ADMINPPATH
@@ -64,11 +74,11 @@ ssh:
     security:
       # 文件大小限制（字节）
       max-upload-size: 104857600        # 100MB
-      max-download-size: 104857600      # 100MB  
+      max-download-size: 104857600      # 100MB
       max-preview-size: 1048576         # 1MB
-      
+
       # 允许的文件扩展名（为空表示允许所有类型）
-      allowed-extensions: 
+      allowed-extensions:
         - txt
         - log
         - md
@@ -106,7 +116,7 @@ ssh:
         - gif
         - bmp
         - svg
-        
+
       # 禁止的文件扩展名
       blocked-extensions:
         - exe
@@ -167,7 +177,6 @@ templates:
         },
         respbody: 'error',
       }
-
     admin:
       - maps: { # index.html 的配置
         port: '8080',
@@ -199,7 +208,6 @@ templates:
         },
         respbody: '<html><body><h2>用户列表</h2><p>这里是命令执行内容。</p></body></html>' # 实际的HTML内容
       }
-
     bee:
       - maps: {
         port: '8090',

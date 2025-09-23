@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防御策略设置</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #1a253c;
+            border-bottom: 2px solid #eef2f5;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .policy-section {
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .form-group label {
+            flex: 1;
+            font-weight: 600;
+            margin-right: 15px;
+        }
+        .form-group input[type="number"],
+        .form-group input[type="text"] {
+            flex: 2;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .form-group .unit {
+            margin-left: 10px;
+            color: #666;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .ip-list-controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+        #search-ip {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 250px;
+        }
+        .ip-list-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .ip-list-table th, .ip-list-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .ip-list-table th {
+            background-color: #f8f9fa;
+            font-weight: 700;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+            width: 100%;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .pagination {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .pagination button {
+            margin: 0 5px;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .pagination button:hover {
+            background-color: #f0f0f0;
+        }
+        .pagination button.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .pagination button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 25px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s, visibility 0.5s;
+            z-index: 1000;
+        }
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>安全防御策略</h1>
+
+    <div class="policy-section">
+        <h2>1. 自动封禁IP策略</h2>
+        <div class="form-group">
+            <label for="attack-freq-ban">当IP在1分钟内攻击频率达到</label>
+            <input type="number" id="attack-freq-ban" value="100">
+            <span class="unit">次时，自动封禁该IP</span>
+        </div>
+        <div class="form-group">
+            <label for="ban-duration">自动封禁持续时间</label>
+            <input type="number" id="ban-duration" value="60">
+            <span class="unit">分钟</span>
+        </div>
+        <button class="btn btn-primary" onclick="saveAutoBanSettings()">保存封禁策略</button>
+    </div>
+
+    <div class="policy-section">
+        <h2>2. 当前已封禁IP列表</h2>
+        <div class="ip-list-controls">
+            <input type="text" id="search-ip" placeholder="搜索IP、原因或时间...">
+        </div>
+        <table class="ip-list-table" id="blocked-ip-table">
+            <thead>
+            <tr>
+                <th>被封禁IP</th>
+                <th>封禁原因</th>
+                <th>到期时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <div class="pagination" id="pagination-controls">
+        </div>
+    </div>
+
+    <div class="policy-section">
+        <h2>3. 短信提醒设置</h2>
+        <div class="form-group">
+            <label for="attack-freq-sms">当网站在5分钟内被攻击总次数达到</label>
+            <input type="number" id="attack-freq-sms" value="1000">
+            <span class="unit">次后，发送短信提醒</span>
+        </div>
+        <div class="form-group">
+            <label for="admin-phone">接收短信的管理员手机号</label>
+            <input type="text" id="admin-phone" placeholder="请输入手机号码" value="13800138000">
+            <span class="unit"></span>
+        </div>
+        <button class="btn btn-primary" onclick="saveSmsSettings()">保存短信设置</button>
+    </div>
+
+</div>
+
+<div id="toast-message" class="toast"></div>
+
+<script>
+    // 模拟的初始数据 (已扩充)
+    let mockBlockedIps = [
+        { ip: "203.0.113.10", reason: "高频请求", expires: "2025-09-23 18:30:00" },
+        { ip: "198.51.100.22", reason: "SQL注入尝试", expires: "2025-09-23 18:45:00" },
+        { ip: "192.0.2.14", reason: "目录扫描", expires: "2025-09-23 19:00:00" },
+        { ip: "10.0.0.1", reason: "高频请求", expires: "2025-09-23 19:15:00" },
+        { ip: "172.16.5.34", reason: "XSS攻击", expires: "2025-09-23 19:30:00" },
+        { ip: "8.8.8.8", reason: "非法访问", expires: "2025-09-23 19:45:00" },
+        { ip: "114.114.114.114", reason: "目录扫描", expires: "2025-09-23 20:00:00" },
+        { ip: "203.0.113.11", reason: "高频请求", expires: "2025-09-23 20:15:00" },
+        { ip: "198.51.100.23", reason: "SQL注入尝试", expires: "2025-09-23 20:30:00" },
+        { ip: "192.0.2.15", reason: "目录扫描", expires: "2025-09-23 20:45:00" },
+        { ip: "10.0.0.2", reason: "高频请求", expires: "2025-09-23 21:00:00" },
+        { ip: "172.16.5.35", reason: "XSS攻击", expires: "2025-09-23 21:15:00" }
+    ];
+
+    // --- 分页和搜索的状态变量 ---
+    let currentPage = 1;
+    const rowsPerPage = 5;
+    let filteredIps = [...mockBlockedIps];
+
+    const searchInput = document.getElementById('search-ip');
+    const tableBody = document.querySelector("#blocked-ip-table tbody");
+    const paginationControls = document.getElementById('pagination-controls');
+
+
+    // --- 核心渲染函数 ---
+    function displayList(items, wrapper, rows_per_page, page) {
+        wrapper.innerHTML = "";
+        page--;
+
+        let start = rows_per_page * page;
+        let end = start + rows_per_page;
+        let paginatedItems = items.slice(start, end);
+
+        paginatedItems.forEach(item => {
+            const originalIndex = mockBlockedIps.findIndex(originalItem => originalItem.ip === item.ip);
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${item.ip}</td>
+                <td>${item.reason}</td>
+                <td>${item.expires}</td>
+                <td>
+                    <button class="btn btn-danger" onclick="permanentlyBlockIp('${item.ip}', ${originalIndex})">
+                        永久封禁
+                    </button>
+                </td>
+            `;
+            wrapper.appendChild(row);
+        });
+    }
+
+    // --- 分页按钮生成函数 ---
+    function setupPagination(items, wrapper, rows_per_page) {
+        wrapper.innerHTML = "";
+        let page_count = Math.ceil(items.length / rows_per_page);
+
+        for (let i = 1; i < page_count + 1; i++) {
+            let btn = createPaginationButton(i, items);
+            wrapper.appendChild(btn);
+        }
+    }
+
+    function createPaginationButton(page, items) {
+        let button = document.createElement('button');
+        button.innerText = page;
+        if (currentPage == page) {
+            button.classList.add('active');
+        }
+        button.addEventListener('click', function () {
+            currentPage = page;
+            displayList(items, tableBody, rowsPerPage, currentPage);
+
+            let current_btn = document.querySelector('.pagination button.active');
+            current_btn.classList.remove('active');
+            button.classList.add('active');
+        });
+        return button;
+    }
+
+    // --- 搜索功能 ---
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.toLowerCase();
+        filteredIps = mockBlockedIps.filter(item =>
+            item.ip.toLowerCase().includes(query) ||
+            item.reason.toLowerCase().includes(query) ||
+            item.expires.toLowerCase().includes(query)
+        );
+        currentPage = 1;
+        renderTableAndPagination();
+    });
+
+    // --- 整合渲染 ---
+    function renderTableAndPagination() {
+        displayList(filteredIps, tableBody, rowsPerPage, currentPage);
+        setupPagination(filteredIps, paginationControls, rowsPerPage);
+    }
+
+    // --- 初始加载 ---
+    window.onload = function() {
+        renderTableAndPagination();
+    };
+
+
+    // --- 其他原有函数 ---
+    function permanentlyBlockIp(ip, originalIndex) {
+        if (confirm(`您确定要永久封禁IP地址 ${ip} 吗？此操作不可逆！`)) {
+            console.log(`正在向后端发送请求，永久封禁IP: ${ip}`);
+            mockBlockedIps.splice(originalIndex, 1);
+            const query = searchInput.value.toLowerCase();
+            if (query) {
+                filteredIps = mockBlockedIps.filter(item =>
+                    item.ip.toLowerCase().includes(query) ||
+                    item.reason.toLowerCase().includes(query) ||
+                    item.expires.toLowerCase().includes(query)
+                );
+            } else {
+                filteredIps = [...mockBlockedIps];
+            }
+            if (Math.ceil(filteredIps.length / rowsPerPage) < currentPage && currentPage > 1) {
+                currentPage--;
+            }
+            renderTableAndPagination();
+            showToast(`IP: ${ip} 已被永久封禁`);
+        }
+    }
+
+    // ==================== 此函数已根据您的截图和要求进行修正 ====================
+    async function saveAutoBanSettings() {
+        const frequency = parseInt(document.getElementById('attack-freq-ban').value, 10);
+        const duration = parseInt(document.getElementById('ban-duration').value, 10);
+
+        const settingsData = {
+            frequency: frequency,
+            duration: duration
+        };
+
+        try {
+            const response = await fetch('http://127.0.0.1:65535/api/policy/autoban', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settingsData)
+            });
+
+            // 将响应作为纯文本读取
+            const responseText = await response.text();
+
+            if (response.ok) {
+                // 直接显示后端返回的文本字符串
+                showToast(responseText);
+            } else {
+                // 如果有错误，也显示错误文本
+                showToast(responseText || '保存失败，请检查服务日志。');
+            }
+        } catch (error) {
+            showToast('保存失败，无法连接到后端服务。');
+        }
+    }
+    // ========================================================================
+
+    function saveSmsSettings() {
+        const frequency = document.getElementById('attack-freq-sms').value;
+        const phone = document.getElementById('admin-phone').value;
+        console.log(`保存短信提醒设置: 频率阈值=${frequency}次/5分钟, 管理员手机=${phone}`);
+        showToast("短信提醒设置已保存");
+    }
+
+    function showToast(message) {
+        const toast = document.getElementById('toast-message');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+</script>
+
+</body>
+</html>

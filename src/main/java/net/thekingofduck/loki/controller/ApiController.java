@@ -431,7 +431,8 @@ public class ApiController {
                 new MenuChild("黑客画像", "page/hackImg.html", "fa fa-gears", "_self"),
                 new MenuChild("终端", "page/nterm.html", "fa fa-gears", "_self"),
                 new MenuChild("文件管理", "page/mfile.html", "fa fa-gears", "_self"),
-                new MenuChild("智能AI", "page/AI.html", "fa fa-gears", "_self")
+                new MenuChild("防御策略", "page/policy.html", "fa fa-gears", "_self")
+//                new MenuChild("智能AI", "page/AI.html", "fa fa-gears", "_self")
 
         );
         MenuInfo menuInfo = new MenuInfo("常规管理", "fa fa-address-book", "", "_self", childList);
