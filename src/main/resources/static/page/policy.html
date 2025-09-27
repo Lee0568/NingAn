@@ -145,23 +145,73 @@
             opacity: 1;
             visibility: visible;
         }
+        .refresh-btn {
+            background-color: #28a745;
+            color: white;
+            margin-left: 10px;
+        }
+        .refresh-btn:hover {
+            background-color: #218838;
+        }
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #pagination-buttons-wrapper {
+            display: flex;
+            align-items: center;
+        }
+        /* 新增页码跳转相关样式 */
+        .jump-to-page {
+            display: flex;
+            align-items: center;
+            margin-left: 15px;
+        }
+        .jump-to-page input {
+            width: 60px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 0 5px;
+            text-align: center;
+        }
+        .jump-to-page button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .jump-to-page button:hover {
+            background-color: #f0f0f0;
+        }
+        .page-info {
+            margin: 0 10px;
+            color: #666;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>安全防御策略</h1>
+    <div class="header-controls">
+        <h1>安全防御策略</h1>
+        <button class="btn refresh-btn" onclick="refreshAllSettings()">获取最新配置信息</button>
+    </div>
 
     <div class="policy-section">
         <h2>1. 自动封禁IP策略</h2>
         <div class="form-group">
             <label for="attack-freq-ban">当IP在1分钟内攻击频率达到</label>
-            <input type="number" id="attack-freq-ban" value="100">
+            <input type="number" id="attack-freq-ban" placeholder="点击'获取最新配置信息'获取" value="">
             <span class="unit">次时，自动封禁该IP</span>
         </div>
         <div class="form-group">
             <label for="ban-duration">自动封禁持续时间</label>
-            <input type="number" id="ban-duration" value="60">
+            <input type="number" id="ban-duration" placeholder="点击'获取最新配置信息'获取" value="">
             <span class="unit">分钟</span>
         </div>
         <button class="btn btn-primary" onclick="saveAutoBanSettings()">保存封禁策略</button>
@@ -170,13 +220,14 @@
     <div class="policy-section">
         <h2>2. 当前已封禁IP列表</h2>
         <div class="ip-list-controls">
-            <input type="text" id="search-ip" placeholder="搜索IP、原因或时间...">
+            <input type="text" id="search-ip" placeholder="搜索IP、模式或到期时间...">
+            <button class="btn refresh-btn" onclick="refreshBlockedIPs()">刷新列表</button>
         </div>
         <table class="ip-list-table" id="blocked-ip-table">
             <thead>
             <tr>
                 <th>被封禁IP</th>
-                <th>封禁原因</th>
+                <th>封禁模式</th>
                 <th>到期时间</th>
                 <th>操作</th>
             </tr>
@@ -185,74 +236,80 @@
             </tbody>
         </table>
         <div class="pagination" id="pagination-controls">
+            <div id="pagination-buttons-wrapper">
+            </div>
         </div>
     </div>
 
     <div class="policy-section">
         <h2>3. 短信提醒设置</h2>
         <div class="form-group">
-            <label for="attack-freq-sms">当网站在5分钟内被攻击总次数达到</label>
-            <input type="number" id="attack-freq-sms" value="1000">
+            <label for="sms-time-window" style="flex: 1.2;">当网站在</label>
+            <input type="number" id="sms-time-window" placeholder="点击'获取最新配置信息'获取" style="flex: 0.5; text-align: center;">
+            <label for="attack-freq-sms" style="flex: 1.5; margin-left: 10px;">分钟内被攻击总次数达到</label>
+            <input type="number" id="attack-freq-sms" placeholder="点击'获取最新配置信息'获取" style="flex: 1;">
             <span class="unit">次后，发送短信提醒</span>
         </div>
         <div class="form-group">
             <label for="admin-phone">接收短信的管理员手机号</label>
-            <input type="text" id="admin-phone" placeholder="请输入手机号码" value="13800138000">
+            <input type="text" id="admin-phone" placeholder="点击'获取最新配置信息'获取">
             <span class="unit"></span>
         </div>
         <button class="btn btn-primary" onclick="saveSmsSettings()">保存短信设置</button>
     </div>
-
 </div>
 
 <div id="toast-message" class="toast"></div>
 
 <script>
-    // 模拟的初始数据 (已扩充)
-    let mockBlockedIps = [
-        { ip: "203.0.113.10", reason: "高频请求", expires: "2025-09-23 18:30:00" },
-        { ip: "198.51.100.22", reason: "SQL注入尝试", expires: "2025-09-23 18:45:00" },
-        { ip: "192.0.2.14", reason: "目录扫描", expires: "2025-09-23 19:00:00" },
-        { ip: "10.0.0.1", reason: "高频请求", expires: "2025-09-23 19:15:00" },
-        { ip: "172.16.5.34", reason: "XSS攻击", expires: "2025-09-23 19:30:00" },
-        { ip: "8.8.8.8", reason: "非法访问", expires: "2025-09-23 19:45:00" },
-        { ip: "114.114.114.114", reason: "目录扫描", expires: "2025-09-23 20:00:00" },
-        { ip: "203.0.113.11", reason: "高频请求", expires: "2025-09-23 20:15:00" },
-        { ip: "198.51.100.23", reason: "SQL注入尝试", expires: "2025-09-23 20:30:00" },
-        { ip: "192.0.2.15", reason: "目录扫描", expires: "2025-09-23 20:45:00" },
-        { ip: "10.0.0.2", reason: "高频请求", expires: "2025-09-23 21:00:00" },
-        { ip: "172.16.5.35", reason: "XSS攻击", expires: "2025-09-23 21:15:00" }
-    ];
-
-    // --- 分页和搜索的状态变量 ---
+    let lastRefreshTime = 0;
+    const MIN_REFRESH_INTERVAL = 1000;
+    let allBlockedIps = [];
+    let filteredIps = [];
     let currentPage = 1;
     const rowsPerPage = 5;
-    let filteredIps = [...mockBlockedIps];
 
-    const searchInput = document.getElementById('search-ip');
-    const tableBody = document.querySelector("#blocked-ip-table tbody");
-    const paginationControls = document.getElementById('pagination-controls');
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM fully loaded and parsed. Initializing page functions.");
 
+        const searchInput = document.getElementById('search-ip');
+        searchInput.addEventListener('input', filterAndRender);
 
-    // --- 核心渲染函数 ---
+        refreshAllSettings();
+        loadBlockedIps();
+    });
+
+    function filterAndRender() {
+        const searchInputEl = document.getElementById('search-ip');
+        const query = searchInputEl ? searchInputEl.value.toLowerCase() : "";
+        if (query) {
+            filteredIps = allBlockedIps.filter(item =>
+                item.ipAddress.toLowerCase().includes(query) ||
+                item.blockMode.toLowerCase().includes(query) ||
+                item.expiresAt.toLowerCase().includes(query)
+            );
+        } else {
+            filteredIps = [...allBlockedIps];
+        }
+        currentPage = 1;
+        renderTableAndPagination();
+    }
+
     function displayList(items, wrapper, rows_per_page, page) {
         wrapper.innerHTML = "";
         page--;
-
         let start = rows_per_page * page;
         let end = start + rows_per_page;
         let paginatedItems = items.slice(start, end);
-
         paginatedItems.forEach(item => {
-            const originalIndex = mockBlockedIps.findIndex(originalItem => originalItem.ip === item.ip);
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${item.ip}</td>
-                <td>${item.reason}</td>
-                <td>${item.expires}</td>
+                <td>${item.ipAddress}</td>
+                <td>${item.blockMode}</td>
+                <td>${item.expiresAt}</td>
                 <td>
-                    <button class="btn btn-danger" onclick="permanentlyBlockIp('${item.ip}', ${originalIndex})">
-                        永久封禁
+                    <button class="btn btn-danger" onclick="unbanIp('${item.ipAddress}')">
+                        解封
                     </button>
                 </td>
             `;
@@ -260,121 +317,304 @@
         });
     }
 
-    // --- 分页按钮生成函数 ---
     function setupPagination(items, wrapper, rows_per_page) {
         wrapper.innerHTML = "";
-        let page_count = Math.ceil(items.length / rows_per_page);
+        const page_count = Math.ceil(items.length / rows_per_page);
 
-        for (let i = 1; i < page_count + 1; i++) {
-            let btn = createPaginationButton(i, items);
-            wrapper.appendChild(btn);
+        if (page_count <= 1) {
+            return;
         }
+
+        // 添加上一页按钮
+        const prevButton = document.createElement('button');
+        prevButton.innerHTML = '&laquo;';
+        prevButton.disabled = currentPage === 1;
+        prevButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTableAndPagination();
+            }
+        });
+        wrapper.appendChild(prevButton);
+
+        // 添加页码按钮
+        const page_window = 2;
+        const createEllipsis = () => {
+            const ellipsis = document.createElement('span');
+            ellipsis.innerText = '...';
+            ellipsis.style.padding = '8px 12px';
+            ellipsis.style.margin = '0 5px';
+            return ellipsis;
+        };
+
+        let buttons = [];
+        buttons.push(createPaginationButton(1, items));
+
+        if (currentPage > page_window + 2) {
+            buttons.push(createEllipsis());
+        }
+
+        for (let i = Math.max(2, currentPage - page_window); i <= Math.min(page_count - 1, currentPage + page_window); i++) {
+            buttons.push(createPaginationButton(i, items));
+        }
+
+        if (currentPage < page_count - (page_window + 1)) {
+            buttons.push(createEllipsis());
+        }
+
+        if (page_count > 1) {
+            buttons.push(createPaginationButton(page_count, items));
+        }
+
+        buttons.forEach(btn => wrapper.appendChild(btn));
+
+        // 添加下一页按钮
+        const nextButton = document.createElement('button');
+        nextButton.innerHTML = '&raquo;';
+        nextButton.disabled = currentPage === page_count;
+        nextButton.addEventListener('click', () => {
+            if (currentPage < page_count) {
+                currentPage++;
+                renderTableAndPagination();
+            }
+        });
+        wrapper.appendChild(nextButton);
+
+        // 添加页码信息和跳转功能
+        const pageInfo = document.createElement('span');
+        pageInfo.className = 'page-info';
+        pageInfo.textContent = `第 ${currentPage} 页，共 ${page_count} 页`;
+        wrapper.appendChild(pageInfo);
+
+        const jumpContainer = document.createElement('div');
+        jumpContainer.className = 'jump-to-page';
+
+        const jumpInput = document.createElement('input');
+        jumpInput.type = 'number';
+        jumpInput.min = 1;
+        jumpInput.max = page_count;
+        jumpInput.placeholder = '页码';
+
+        const jumpButton = document.createElement('button');
+        jumpButton.textContent = '跳转';
+        jumpButton.addEventListener('click', jumpToPage);
+
+        jumpInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                jumpToPage();
+            }
+        });
+
+        jumpContainer.appendChild(document.createTextNode('跳转到'));
+        jumpContainer.appendChild(jumpInput);
+        jumpContainer.appendChild(jumpButton);
+        wrapper.appendChild(jumpContainer);
     }
 
     function createPaginationButton(page, items) {
         let button = document.createElement('button');
         button.innerText = page;
-        if (currentPage == page) {
-            button.classList.add('active');
-        }
+        if (currentPage == page) button.classList.add('active');
         button.addEventListener('click', function () {
             currentPage = page;
-            displayList(items, tableBody, rowsPerPage, currentPage);
-
-            let current_btn = document.querySelector('.pagination button.active');
-            current_btn.classList.remove('active');
-            button.classList.add('active');
+            renderTableAndPagination();
         });
         return button;
     }
 
-    // --- 搜索功能 ---
-    searchInput.addEventListener('input', () => {
-        const query = searchInput.value.toLowerCase();
-        filteredIps = mockBlockedIps.filter(item =>
-            item.ip.toLowerCase().includes(query) ||
-            item.reason.toLowerCase().includes(query) ||
-            item.expires.toLowerCase().includes(query)
-        );
-        currentPage = 1;
-        renderTableAndPagination();
-    });
-
-    // --- 整合渲染 ---
     function renderTableAndPagination() {
-        displayList(filteredIps, tableBody, rowsPerPage, currentPage);
-        setupPagination(filteredIps, paginationControls, rowsPerPage);
-    }
-
-    // --- 初始加载 ---
-    window.onload = function() {
-        renderTableAndPagination();
-    };
-
-
-    // --- 其他原有函数 ---
-    function permanentlyBlockIp(ip, originalIndex) {
-        if (confirm(`您确定要永久封禁IP地址 ${ip} 吗？此操作不可逆！`)) {
-            console.log(`正在向后端发送请求，永久封禁IP: ${ip}`);
-            mockBlockedIps.splice(originalIndex, 1);
-            const query = searchInput.value.toLowerCase();
-            if (query) {
-                filteredIps = mockBlockedIps.filter(item =>
-                    item.ip.toLowerCase().includes(query) ||
-                    item.reason.toLowerCase().includes(query) ||
-                    item.expires.toLowerCase().includes(query)
-                );
-            } else {
-                filteredIps = [...mockBlockedIps];
-            }
-            if (Math.ceil(filteredIps.length / rowsPerPage) < currentPage && currentPage > 1) {
-                currentPage--;
-            }
-            renderTableAndPagination();
-            showToast(`IP: ${ip} 已被永久封禁`);
+        const tableBody = document.querySelector("#blocked-ip-table tbody");
+        const buttonsWrapper = document.getElementById('pagination-buttons-wrapper');
+        if (tableBody && buttonsWrapper) {
+            displayList(filteredIps, tableBody, rowsPerPage, currentPage);
+            setupPagination(filteredIps, buttonsWrapper, rowsPerPage);
+        } else {
+            console.error("关键渲染元素 'tableBody' 或 'pagination-buttons-wrapper' 未找到!");
         }
     }
 
-    // ==================== 此函数已根据您的截图和要求进行修正 ====================
-    async function saveAutoBanSettings() {
-        const frequency = parseInt(document.getElementById('attack-freq-ban').value, 10);
-        const duration = parseInt(document.getElementById('ban-duration').value, 10);
+    function jumpToPage() {
+        const jumpInput = document.querySelector('.jump-to-page input');
+        if (!jumpInput) return;
 
+        const pageCount = Math.ceil(filteredIps.length / rowsPerPage);
+        let targetPage = parseInt(jumpInput.value);
+
+        if (isNaN(targetPage) || targetPage < 1 || targetPage > pageCount) {
+            showToast(`请输入有效的页码 (1-${pageCount})`);
+            jumpInput.value = '';
+            return;
+        }
+
+        currentPage = targetPage;
+        renderTableAndPagination();
+        jumpInput.value = '';
+    }
+
+    async function loadBlockedIps() {
+        console.log("Fetching blocked IP list...");
+        try {
+            const response = await fetch('/api/policy/blocked-ips', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const rawText = await response.text();
+            allBlockedIps = JSON.parse(rawText);
+            filterAndRender();
+        } catch (error) {
+            console.error("Failed to load or parse blocked IPs:", error);
+            showToast("加载封禁IP列表失败。");
+            allBlockedIps = [];
+            filterAndRender();
+        }
+    }
+
+    async function refreshBlockedIPs() {
+        if (!canRefresh()) return;
+        await loadBlockedIps();
+        showToast("已刷新封禁IP列表。");
+    }
+
+    async function unbanIp(ip) {
+        if (!confirm(`您确定要解封IP地址 ${ip} 吗？`)) return;
+        try {
+            const response = await fetch(`/api/policy/blocked-ips/${ip}`, {
+                method: 'DELETE',
+                credentials: 'same-origin'
+            });
+            const responseText = await response.text();
+            showToast(responseText);
+            if (response.ok) {
+                await loadBlockedIps();
+            }
+        } catch (error) {
+            console.error("Failed to unban IP:", error);
+            showToast("解封失败。");
+        }
+    }
+
+    function canRefresh() {
+        const now = Date.now();
+        if (now - lastRefreshTime < MIN_REFRESH_INTERVAL) {
+            showToast("操作过于频繁，请稍后再试");
+            return false;
+        }
+        lastRefreshTime = now;
+        return true;
+    }
+
+    async function loadAutoBanSettings() {
+        console.log("Attempting to fetch auto-ban settings...");
+        try {
+            const response = await fetch('http://127.0.0.1:65535/api/policy/autoban', {credentials:'same-origin'});
+            if (response.ok) {
+                const settings = await response.json();
+                document.getElementById('attack-freq-ban').value = settings.frequency;
+                document.getElementById('ban-duration').value = settings.duration;
+                return true;
+            } else {
+                showToast("加载当前策略失败。");
+                return false;
+            }
+        } catch (error) {
+            showToast("加载当前策略失败。");
+            return false;
+        }
+    }
+
+    async function saveAutoBanSettings() {
+        const freqInput = document.getElementById('attack-freq-ban');
+        const durationInput = document.getElementById('ban-duration');
+        if (!freqInput.value || !durationInput.value) {
+            showToast('请先获取最新配置信息。');
+            return;
+        }
+        const frequency = parseInt(freqInput.value, 10);
+        const duration = parseInt(durationInput.value, 10);
         const settingsData = {
             frequency: frequency,
             duration: duration
         };
-
         try {
             const response = await fetch('http://127.0.0.1:65535/api/policy/autoban', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(settingsData)
             });
-
-            // 将响应作为纯文本读取
             const responseText = await response.text();
-
             if (response.ok) {
-                // 直接显示后端返回的文本字符串
                 showToast(responseText);
+                setTimeout(() => {
+                    loadAutoBanSettings();
+                }, 1000);
             } else {
-                // 如果有错误，也显示错误文本
-                showToast(responseText || '保存失败，请检查服务日志。');
+                showToast(responseText || '保存失败。');
             }
         } catch (error) {
-            showToast('保存失败，无法连接到后端服务。');
+            showToast('保存失败。');
         }
     }
-    // ========================================================================
 
-    function saveSmsSettings() {
-        const frequency = document.getElementById('attack-freq-sms').value;
+    async function saveSmsSettings() {
+        const timeWindow = parseInt(document.getElementById('sms-time-window').value, 10);
+        const attacks = parseInt(document.getElementById('attack-freq-sms').value, 10);
         const phone = document.getElementById('admin-phone').value;
-        console.log(`保存短信提醒设置: 频率阈值=${frequency}次/5分钟, 管理员手机=${phone}`);
-        showToast("短信提醒设置已保存");
+        if (!timeWindow || !attacks || !phone.trim()) {
+            showToast("所有短信设置项均为必填项。");
+            return;
+        }
+        const settingsData = {
+            timeWindowMinutes: timeWindow,
+            attacksAmount: attacks,
+            phone: phone
+        };
+        try {
+            const response = await fetch('http://127.0.0.1:65535/api/policy/updateSmsSettings', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settingsData)
+            });
+            const responseText = await response.text();
+            if (response.ok) {
+                showToast(responseText);
+            } else {
+                showToast(responseText || '保存失败。');
+            }
+        } catch (error) {
+            console.error("保存短信设置时出错:", error);
+            showToast('保存失败。');
+        }
+    }
+
+    async function loadSmsSettings() {
+        console.log("Attempting to fetch SMS settings...");
+        try {
+            const response = await fetch('http://127.0.0.1:65535/api/policy/updateSmsSettings', {credentials:'same-origin'});
+            if (response.ok) {
+                const settings = await response.json();
+                document.getElementById('sms-time-window').value = settings.timeWindowMinutes;
+                document.getElementById('attack-freq-sms').value = settings.attacksAmount;
+                document.getElementById('admin-phone').value = settings.phone;
+                return true;
+            } else {
+                showToast("加载短信策略失败。");
+                return false;
+            }
+        } catch (error) {
+            showToast("加载短信策略失败。");
+            return false;
+        }
+    }
+
+    async function refreshAllSettings() {
+        if (!canRefresh()) return;
+        showToast("正在获取最新配置信息...");
+        try {
+            await Promise.all([loadAutoBanSettings(), loadSmsSettings()]);
+            showToast("配置信息已全部更新。");
+        } catch (error) {
+            showToast("部分配置信息刷新失败。");
+        }
     }
 
     function showToast(message) {
@@ -385,7 +625,15 @@
             toast.classList.remove('show');
         }, 3000);
     }
-</script>
 
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'F5') { return; }
+        if (event.ctrlKey && (event.key === 'r' || event.key === 'R')) {
+            event.preventDefault();
+            refreshAllSettings();
+            refreshBlockedIPs();
+        }
+    });
+</script>
 </body>
 </html>

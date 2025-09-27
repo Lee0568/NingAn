@@ -13,6 +13,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Deque;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +26,8 @@ public class IpThrottlingInterceptor implements HandlerInterceptor {
     private static final Logger logger = LoggerFactory.getLogger(IpThrottlingInterceptor.class);
     private final Map<String, Deque<Long>> requestTimestamps = new ConcurrentHashMap<>();
 
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     @Autowired
     private BlockedIpRepository blockedIpRepository;
     @Autowired
@@ -34,21 +37,29 @@ public class IpThrottlingInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String ip = getClientIp(request);
 
-        // 步骤 1: 检查IP是否在黑名单中
         Optional<BlockedIp> blockedIpOptional = blockedIpRepository.findById(ip);
         if (blockedIpOptional.isPresent()) {
             BlockedIp blockedIp = blockedIpOptional.get();
-            if (LocalDateTime.now().isBefore(blockedIp.getExpiresAt())) {
-                logger.warn("Blocked IP {} denied access.", ip);
-                response.setStatus(HttpStatus.FORBIDDEN.value());
-                response.getWriter().write("Your IP is currently blocked.");
-                return false;
-            } else {
+
+            try {
+                // 将 String 类型的过期时间解析为 LocalDateTime 对象
+                LocalDateTime expiresAt = LocalDateTime.parse(blockedIp.getExpiresAt(), formatter);
+
+                // 再进行时间比较
+                if (LocalDateTime.now().isBefore(expiresAt)) {
+                    logger.warn("Blocked IP {} denied access.", ip);
+                    response.setStatus(HttpStatus.FORBIDDEN.value());
+                    response.getWriter().write("Your IP is currently blocked.");
+                    return false;
+                } else {
+                    blockedIpRepository.delete(blockedIp);
+                }
+            } catch (Exception e) {
+                logger.error("Failed to parse expires_at string: {}. Deleting record for IP: {}", blockedIp.getExpiresAt(), ip);
                 blockedIpRepository.delete(blockedIp);
             }
         }
 
-        // 步骤 2: 滑动窗口计数
         long currentTime = System.currentTimeMillis();
         requestTimestamps.putIfAbsent(ip, new ConcurrentLinkedDeque<>());
         Deque<Long> timestamps = requestTimestamps.get(ip);
@@ -57,17 +68,19 @@ public class IpThrottlingInterceptor implements HandlerInterceptor {
         }
         timestamps.addLast(currentTime);
 
-        // 步骤 3: 检查是否超限并执行封禁
         if (timestamps.size() > policyManager.getFrequencyThreshold()) {
             logger.warn("IP {} exceeded rate limit. Blocking now.", ip);
 
             BlockedIp newBlock = new BlockedIp();
             newBlock.setIpAddress(ip);
-            LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(policyManager.getBanDurationMinutes());
-            newBlock.setExpiresAt(expiresAt);
 
-            // --- 关键更新 ---
-            // 设置封禁模式为“自动”
+            // 计算 LocalDateTime 类型的过期时间
+            LocalDateTime expiresAtLdt = LocalDateTime.now().plusMinutes(policyManager.getBanDurationMinutes());
+            // 将 LocalDateTime 对象格式化为 String 类型
+            String expiresAtStr = expiresAtLdt.format(formatter);
+            // 将 String 类型的时间存入实体
+            newBlock.setExpiresAt(expiresAtStr);
+
             newBlock.setBlockMode("自动");
 
             blockedIpRepository.save(newBlock);

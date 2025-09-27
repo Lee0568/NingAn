@@ -6,6 +6,7 @@ import net.thekingofduck.loki.entity.UserInfoEntity;
 import org.apache.ibatis.annotations.*;
 import org.springframework.http.HttpEntity;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -148,4 +149,15 @@ public interface HttpLogMapper {
      */
     @Update("UPDATE `main`.`httplog` SET `canvasId` = #{canvasId} WHERE id = (SELECT MAX(id) FROM `main`.`httplog`)")
     Integer updateCanvasIdForLastHttpLog(@Param("canvasId") String canvasId);
+
+
+    /**
+     * 根据起始和结束时间查询日志记录
+     *
+     * @param startTime 起始时间，格式为 'yyyy-MM-dd HH:mm:ss'
+     * @param endTime   结束时间，格式为 'yyyy-MM-dd HH:mm:ss'
+     * @return 日志实体列表
+     */
+    @Select("SELECT * FROM httplog WHERE datetime(time) BETWEEN datetime(#{startTime}) AND datetime(#{endTime})")
+    List<HttpLogEntity> findLogsBetweenDates(@Param("startTime") String startTime, @Param("endTime") String endTime);
 }

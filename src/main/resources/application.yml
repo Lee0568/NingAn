@@ -219,3 +219,8 @@ templates:
         },
         respbody: 'error',
       }
+
+smsbao:
+  username: "这里填您的短信宝用户名"
+  password: "这里填您的短信宝明文密码"
+  signature: "【这里填您审核通过的签名】"

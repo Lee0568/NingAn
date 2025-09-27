@@ -1,41 +1,47 @@
 package net.thekingofduck.loki.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 import net.thekingofduck.loki.entity.IpBanEntity;
+import net.thekingofduck.loki.model.BlockedIp; // 注意：导入的是 model 包下的 BlockedIp
+import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
+/**
+ * 负责 blocked_ip 表相关的数据操作，以及部分关联查询。
+ */
 @Mapper
 public interface IpBanMapper {
 
-    // 修正 findByIpAddress 方法：
-    // 1. 明确选择需要的字段 (ip, isBan)。
-    // 2. 添加 LIMIT 1 来确保只返回一条记录。
-    //    这里假设 httplog 表有 'id' 字段作为主键，或者 'time' 字段作为记录时间。
-    //    您可以选择按 id 或 time 降序或升序排序后取第一条，因为 isBan 字段是统一的。
+    // (此方法不受影响，保持不变)
     @Select("SELECT ip, isBan FROM httplog WHERE ip = #{ip} ORDER BY id DESC LIMIT 1")
-    // 或者，如果您更倾向于使用时间戳字段，并且有 'time' 字段：
-    // @Select("SELECT ip, isBan FROM httplog WHERE ip = #{ip} ORDER BY time DESC LIMIT 1")
-    IpBanEntity findByIpAddress(@Param("ip") String ipAddress); // 使用 @Param 确保参数名匹配
+    IpBanEntity findByIpAddress(@Param("ip") String ipAddress);
 
-    /**
-     * 将指定 IP 的封禁状态设置为 0 (解封)。
-     * 针对表 `httplog` 和字段 `isBan` 进行操作。
-     *
-     * @param canvasId 要解封的 IP 地址
-     * @return 更新的记录数
-     */
-    @Update("UPDATE httplog SET isBan = 0 WHERE canvasId = #{canvasId}")
+    // --- ▼▼▼ 修改 SQL 中的列名 ▼▼▼ ---
+    @Delete("DELETE FROM blocked_ip WHERE canvas_id = #{canvasId}")
     int updateIpStatus0(@Param("canvasId") String canvasId);
 
-    /**
-     * 将指定 IP 的封禁状态设置为 1 (封禁)。
-     * 针对表 `httplog` 和字段 `isBan` 进行操作。
-     *
-     * @param canvasId 要封禁的 IP 地址
-     * @return 更新的记录数
-     */
-    @Update("UPDATE httplog SET isBan = 1 WHERE canvasId = #{canvasId}")
+    // --- ▼▼▼ 修改 SQL 中的列名 ▼▼▼ ---
+    @Insert("INSERT OR REPLACE INTO blocked_ip (ip_address, expires_at, block_mode, canvas_id) " +
+            "SELECT DISTINCT ip, '9999-12-31 23:59:59', '手动', #{canvasId} " +
+            "FROM httplog " +
+            "WHERE canvasId = #{canvasId} AND ip IS NOT NULL AND ip != ''")
     int updateIpStatus1(@Param("canvasId") String canvasId);
+
+    // --- ▼▼▼ 修改 SQL 和 @Result 中的列名 ▼▼▼ ---
+    @Results({
+            @Result(property = "ipAddress", column = "ip_address"),
+            @Result(property = "expiresAt", column = "expires_at"),
+            @Result(property = "blockMode", column = "block_mode"),
+            @Result(property = "canvasId", column = "canvas_id") // 此处也修改
+    })
+    @Select("SELECT ip_address, expires_at, block_mode, canvas_id FROM blocked_ip") // 此处也修改
+    List<BlockedIp> findAllBlockedIps();
+
+    /**
+     * 根据IP地址删除一条封禁记录。
+     * @param ipAddress 要解封的IP地址
+     * @return 删除的行数 (通常是 1 或 0)
+     */
+    @Delete("DELETE FROM blocked_ip WHERE ip_address = #{ipAddress}")
+    int deleteByIpAddress(@Param("ipAddress") String ipAddress);
 }

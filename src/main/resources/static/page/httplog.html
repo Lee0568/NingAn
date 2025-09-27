@@ -38,15 +38,10 @@
             </div>
         </script>
 
-<!--        <table class="layui-hide" id="currentTableId" lay-filter="currentTableFilter"></table>-->
         <table class="layui-hide" id="httplog" lay-filter="httplog" ></table>
-
-
 
     </div>
 </div>
-
-<!--<table class="layui-hide" id="httplog" lay-filter="httplog" ></table>-->
 
 <fieldset class="layui-elem-field layui-field-title" style="margin-top: 5px;">
     <legend>请求面板</legend>
@@ -108,17 +103,19 @@ public class Loki {
                 icon: 'layui-icon-tips'
             }]
             ,cellMinWidth: 80
+            // --- ▼▼▼【核心修改部分】▼▼▼ ---
             ,cols: [
                 [
                     {type: "checkbox", width: '5%'},
-                    {field:'id', width:'7%', title: '数据id'}
-                    ,{field:'ip', width:'10%', title: '来源地址'}
-                    ,{field:'method', width:'8%', title: '请求方法'}
-                    ,{field:'path', width:'25%', title: '请求路径'}
-                    // ,{field:'parameter', width:'30%', title: '请求参数'}
-                    ,{field:'time', width:'45%', title: '请求时间'}
+                    {field:'id', width:'5%', title: 'ID'},
+                    {field:'ip', width:'10%', title: '来源地址'},
+                    {field:'method', width:'7%', title: '请求方法'},
+                    {field:'path', width:'20%', title: '请求路径'},
+                    {field:'parameter', width:'28%', title: '请求参数'}, // 取消注释并调整宽度
+                    {field:'time', width:'25%', title: '请求时间'}
                 ]
             ]
+            // --- ▲▲▲【核心修改部分】▲▲▲ ---
             ,total:true
             ,page: {
                 layout: ['prev', 'next', 'skip', 'count', 'limit', 'refresh']
@@ -133,15 +130,27 @@ public class Loki {
             }
         });
 
-        //监听行单击事件（双击事件为：rowDouble）
+        //监听行单击事件
         table.on('row(httplog)', function(obj){
             var data = obj.data;
 
-            var request = document.getElementById("headers");
-            request.innerHTML = JSON.stringify(JSON.parse(data['headers']), null, 2);  // 格式化显示
+            // 安全地格式化 Headers
+            try {
+                var headersJson = JSON.parse(data['headers']);
+                document.getElementById("headers").innerHTML = JSON.stringify(headersJson, null, 2);
+            } catch (e) {
+                // 如果解析失败（比如headers为null或非JSON字符串），则直接显示原始文本
+                document.getElementById("headers").innerText = data['headers'] || 'N/A';
+            }
 
-            var response = document.getElementById("body");
-            response.innerHTML = JSON.stringify(JSON.parse(data['body']), null, 2);  // 格式化显示
+            // 安全地格式化 Body
+            try {
+                var bodyJson = JSON.parse(data['body']);
+                document.getElementById("body").innerHTML = JSON.stringify(bodyJson, null, 2);
+            } catch (e) {
+                // 如果解析失败，直接显示原始文本
+                document.getElementById("body").innerText = data['body'] || 'N/A';
+            }
 
             //标注选中样式
             obj.tr.addClass('layui-table-click').siblings().removeClass('layui-table-click');
@@ -155,46 +164,38 @@ public class Loki {
                 var checkStatus = table.checkStatus('httplog')
                     , data = checkStatus.data;
 
-
                 var arr = new Array();
-
                 for(var i = 0;i<data.length;i++){
                     arr.push(data[i]['id']);
                 }
 
-                //alert(arr.join(","));
+                if (arr.length === 0) {
+                    layer.msg('请先选择需要删除的行');
+                    return;
+                }
 
-
-                layer.confirm('确定删除吗?', {btn: ['确定删除', '取消']}, function (index) {
-
-
-
+                layer.confirm('确定删除选中的 ' + arr.length + ' 条记录吗?', {btn: ['确定删除', '取消']}, function (index) {
                     $.post("/api/httplog/delete",
                         {
                             ids:arr.join(",")
                         },
                         function(data,status){
-                            //layer.alert("数据：" + arr.join(",") + "\n状态：" + status);
-                            // alert("数据：" + data + "\n状态：" + status);
+                            layer.msg('删除成功', {icon: 1});
+                            // 重新加载表格
+                            table.reload('httplog');
                         });
-                        layer.closeAll("dialog");
+                    layer.close(index);
                 });
-
-                // layer.alert(JSON.stringify(data));
             }
         });
 
-
-
-
-
         //自动刷新
         setInterval(function () {
-            $(".layui-icon-refresh").click();
+            // 只在没有弹出层时才刷新，避免干扰用户操作
+            if ($(".layui-layer-page").length === 0) {
+                $(".layui-icon-refresh").click();
+            }
         }, 15000);
-
-
-
     });
 </script>
 
