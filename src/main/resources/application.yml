@@ -220,7 +220,7 @@ templates:
         respbody: 'error',
       }
 
-smsbao:
-  username: "这里填您的短信宝用户名"
-  password: "这里填您的短信宝明文密码"
-  signature: "【这里填您审核通过的签名】"
+#smsbao:
+#  username: "qdgqidgqd"
+#  password: "123456asd*X"
+#  signature: "【柠安安全蜜罐】您的网站在过去{num}分钟内检测到{count}次攻击，已超过{threshold}次的阈值。请立即检查系统安全！"

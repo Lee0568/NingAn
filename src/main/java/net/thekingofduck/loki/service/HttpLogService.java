@@ -14,11 +14,16 @@ import net.thekingofduck.loki.model.BlockedIp;
 import net.thekingofduck.loki.model.SecuritySetting;
 import net.thekingofduck.loki.repository.SecuritySettingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+// import org.springframework.beans.factory.annotation.Value; // 不再需要
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+// import org.springframework.web.client.RestTemplate; // 不再需要 RestTemplate
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -46,51 +51,20 @@ public class HttpLogService {
     @Autowired
     private SecuritySettingMapper securitySettingMapper;
 
-    // --- ▼▼▼【核心修复 1】▼▼▼ ---
-    // 在类顶部注入由 Spring 管理的 RestTemplate 单例
-    @Autowired
-    private RestTemplate restTemplate;
-    // --- ▲▲▲【核心修复 1】▲▲▲ ---
-
-    @Value("${smsbao.username}")
-    private String smsbaoUsername;
-
-    @Value("${smsbao.password}")
-    private String smsbaoPassword;
-
-    @Value("${smsbao.signature}")
-    private String smsbaoSignature;
-
     private final List<AttackPattern> attackPatterns;
     private static final int SMS_COOLDOWN_MINUTES = 30;
     private long lastSmsSentTimestamp = 0;
 
     public HttpLogService() {
         attackPatterns = new ArrayList<>();
-        // 1. XSS 攻击模式 (优先级提前)
-        attackPatterns.add(new AttackPattern(
-                "XSS攻击",
-                "(?i)(<\\/?\\s*script\\b[^>]*>|javascript:|on[a-z]+\\s*=|expression\\(|<\\s*svg\\/onload|<\\s*img[^>]+src\\s*=|data:text\\/html)",
-                Arrays.asList("script", "alert", "javascript", "onerror", "onload", "confirm", "prompt", "src", "svg")
-        ));
-
-        // 2. SQL 注入模式 (优先级调后)
-        attackPatterns.add(new AttackPattern(
-                "SQL注入",
-                "(?i)(union\\s+select|select\\s+.*\\s+from|information_schema|xp_cmdshell|declare\\s+@v|exec\\s+|sleep\\s*\\(|\\bwaitfor\\s+delay\\b|benchmark\\s*\\(|load_file\\s*\\(|outfile\\s*|dumpfile\\s*|utl_inaddr\\.get_host_name|utl_http\\.request|dbms_pipe\\.receive_message|from\\s+[a-z_]+\\s+where\\s+\\w+=\\w+|\\b(?:OR|AND|XOR)\\b\\s*['\"\\d]+\\s*[=><!]\\s*['\"\\d]+|['\"]\\s*(?:OR|AND|XOR)\\s*['\"]?[a-z0-9_.]*['\"]?\\s*[=><!]\\s*['\"]?[a-z0-9_.]*['\"]?|\\b(OR|AND)\\s*\\d+=\\d+\\b|\\b(OR|AND)\\s*\\w+=\\w+\\b|--|#|\\/\\*|;|\\b(insert|update|delete)\\b.*\\bwhere\\b|convert\\s*\\(|cast\\s*\\(|ascii\\s*\\(|substring\\s*\\(|mid\\s*\\(|len\\s*\\(|length\\s*\\(|char\\s*\\(|concat\\s*\\(|schema_name\\s*|table_name\\s*|column_name\\s*)",
-                Arrays.asList(
-                        "select", "union", "or", "and", "from", "where",
-                        "information_schema", "exec", "xp_cmdshell", "sleep",
-                        "waitfor", "benchmark", "load_file", "outfile", "dumpfile",
-                        "insert", "update", "delete", "convert", "cast", "ascii",
-                        "substring", "mid", "len", "length", "char", "concat",
-                        "schema_name", "table_name", "column_name"
-                )
-        ));
+        // XSS 攻击模式 (优先级提前)
+        attackPatterns.add(new AttackPattern("XSS攻击", "(?i)(<\\/?\\s*script\\b[^>]*>|javascript:|on[a-z]+\\s*=|expression\\(|<\\s*svg\\/onload|<\\s*img[^>]+src\\s*=|data:text\\/html)", Arrays.asList("script", "alert", "javascript", "onerror", "onload", "confirm", "prompt", "src", "svg")));
+        // SQL 注入模式 (优先级调后)
+        attackPatterns.add(new AttackPattern("SQL注入", "(?i)(union\\s+select|select\\s+.*\\s+from|information_schema|xp_cmdshell|declare\\s+@v|exec\\s+|sleep\\s*\\(|\\bwaitfor\\s+delay\\b|benchmark\\s*\\(|load_file\\s*\\(|outfile\\s*|dumpfile\\s*|utl_inaddr\\.get_host_name|utl_http\\.request|dbms_pipe\\.receive_message|from\\s+[a-z_]+\\s+where\\s+\\w+=\\w+|\\b(?:OR|AND|XOR)\\b\\s*['\"\\d]+\\s*[=><!]\\s*['\"\\d]+|['\"]\\s*(?:OR|AND|XOR)\\s*['\"]?[a-z0-9_.]*['\"]?\\s*[=><!]\\s*['\"]?[a-z0-9_.]*['\"]?|\\b(OR|AND)\\s*\\d+=\\d+\\b|\\b(OR|AND)\\s*\\w+=\\w+\\b|--|#|\\/\\*|;|\\b(insert|update|delete)\\b.*\\bwhere\\b|convert\\s*\\(|cast\\s*\\(|ascii\\s*\\(|substring\\s*\\(|mid\\s*\\(|len\\s*\\(|length\\s*\\(|char\\s*\\(|concat\\s*\\(|schema_name\\s*|table_name\\s*|column_name\\s*)", Arrays.asList("select", "union", "or", "and", "from", "where", "information_schema", "exec", "xp_cmdshell", "sleep", "waitfor", "benchmark", "load_file", "outfile", "dumpfile", "insert", "update", "delete", "convert", "cast", "ascii", "substring", "mid", "len", "length", "char", "concat", "schema_name", "table_name", "column_name")));
         // 文件包含模式
         attackPatterns.add(new AttackPattern("文件包含", "(?i)(php:\\/\\/filter|file:\\/\\/|data:\\/\\/|phar:\\/\\/|zip:\\/\\/|compress\\.zlib:\\/\\/|glob:\\/\\/|\\/etc\\/passwd|\\/proc\\/self\\/environ|\\.\\.\\/|%2e%2e%2f|%252e%252e%252f)", Arrays.asList("php://", "file://", "/etc/passwd", "../")));
         // SSRF (Server-Side Request Forgery)
-        attackPatterns.add(new AttackPattern("SSRF", "(?i)(file:\\/\\/|gopher:\\/\\/|dict:\\/\\/|ftp:\\/\\/|http[s]?:\\/\\/(localhost|127\\.0\\.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+))", Arrays.asList("file://", "gopher://", "dict://")));
+        attackPatterns.add(new AttackPattern("SSRF", "(?i)(file:\\/\\/|gopher:\\/\\/|dict:\\/\\/|ftp:\\/\\/|http[s]?:\\/\\/(localhost|127\\.0.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+|192\\.168\\.\\d+\\.\\d+))", Arrays.asList("file://", "gopher://", "dict://")));
     }
 
     @Scheduled(fixedRate = 60000)
@@ -143,17 +117,39 @@ public class HttpLogService {
             System.out.println("【短信提醒】短信功能处于冷却中，本次警报已抑制。");
             return;
         }
-        String content = String.format("您的网站在过去 %d 分钟内检测到 %d 次攻击，已超过 %d 次的阈值。请立即检查系统安全！", timeWindowMinutes, attackCount, attackThreshold);
-        String fullContent = this.smsbaoSignature + content;
+
+        // 1. 定义您的账户信息 (硬编码未变)
+        String username = "qdgqidgqd";
+        String password = "123456asd*X";
+        String signature = "【柠安安全蜜罐】";
+
+        // 2. 构造填充了真实数据的短信内容 (不包含签名)
+        String content = String.format(
+                "您的网站在过去 %d 分钟内检测到 %d 次攻击，已超过 %d 次的阈值。请立即检查系统安全！",
+                timeWindowMinutes,
+                attackCount,
+                attackThreshold
+        );
+
+        // 3. 将签名和内容拼接成最终要发送的完整内容
+        String fullContent = signature + content;
+
+        // 4. 构造请求参数，严格遵循官方文档
+        String httpUrl = "http://api.smsbao.com/sms";
+        StringBuffer httpArg = new StringBuffer();
+
         try {
-            String passwordMd5 = md5(this.smsbaoPassword);
-            String contentUrlEncoded = URLEncoder.encode(fullContent, StandardCharsets.UTF_8.toString());
-            String url = String.format("http://api.smsbao.com/sms?u=%s&p=%s&m=%s&c=%s", this.smsbaoUsername, passwordMd5, phoneNumber, contentUrlEncoded);
+            String passwordMd5 = md5(password);
+
+            httpArg.append("u=").append(username).append("&");
+            httpArg.append("p=").append(passwordMd5).append("&");
+            httpArg.append("m=").append(phoneNumber).append("&");
+            httpArg.append("c=").append(encodeUrlString(fullContent, "UTF-8"));
+
             System.out.println("【短信提醒】准备发送短信到: " + phoneNumber);
 
-            // 直接使用由 Spring 注入的 restTemplate 实例，不再 new
-            String result = restTemplate.getForObject(url, String.class);
-            // --- ▲▲▲【核心修复 2】▲▲▲ ---
+            // 调用官方文档的 request 方法
+            String result = request(httpUrl, httpArg.toString());
 
             if ("0".equals(result)) {
                 System.out.println("【短信提醒】短信发送成功！");
@@ -167,16 +163,83 @@ public class HttpLogService {
         }
     }
 
-    private static String md5(String text) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("MD5");
-        md.update(text.getBytes(StandardCharsets.UTF_8));
-        byte[] digest = md.digest();
-        StringBuilder sb = new StringBuilder();
-        for (byte b : digest) {
-            sb.append(String.format("%02x", b));
+    /**
+     * 【官方文档实现】MD5加密
+     */
+    public static String md5(String plainText) {
+        StringBuffer buf = null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            md.update(plainText.getBytes(StandardCharsets.UTF_8)); // 使用 UTF-8 确保一致性
+            byte b[] = md.digest();
+            int i;
+            buf = new StringBuffer("");
+            for (int offset = 0; offset < b.length; offset++) {
+                i = b[offset];
+                if (i < 0)
+                    i += 256;
+                if (i < 16)
+                    buf.append("0");
+                buf.append(Integer.toHexString(i));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
         }
-        return sb.toString();
+        return buf != null ? buf.toString() : "";
     }
+
+    /**
+     * 【官方文档实现】URL 编码
+     */
+    public static String encodeUrlString(String str, String charset) {
+        String strret = null;
+        if (str == null)
+            return str;
+        try {
+            strret = java.net.URLEncoder.encode(str, charset);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+        return strret;
+    }
+
+    /**
+     * 【官方文档实现】发送请求
+     */
+    public static String request(String httpUrl, String httpArg) {
+        BufferedReader reader = null;
+        String result = null;
+        StringBuffer sbf = new StringBuffer();
+        httpUrl = httpUrl + "?" + httpArg;
+
+        try {
+            URL url = new URL(httpUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.connect();
+            InputStream is = connection.getInputStream();
+            reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            String strRead = reader.readLine();
+            if (strRead != null) {
+                sbf.append(strRead);
+                while ((strRead = reader.readLine()) != null) {
+                    sbf.append("\n");
+                    sbf.append(strRead);
+                }
+            }
+            if (reader != null) { // 增加对 reader 的 null 检查
+                reader.close();
+            }
+            result = sbf.toString();
+        } catch (Exception e) {
+            // 在 Spring 容器中，这里是 Service 层，不应该静态捕获，但为了严格遵循官方文档的结构，我们保留
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    // ... 后续代码不变 ...
 
     public void updateSmsSettings(int timeWindowMinutes, int attacksAmount, String phone) {
         SecuritySetting timeWindowSetting = new SecuritySetting();
