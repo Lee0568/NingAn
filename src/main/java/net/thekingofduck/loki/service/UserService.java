@@ -22,10 +22,6 @@ import java.util.Map;
 @Service
 public class UserService {
 
-    // 模拟的当前路径，与前端保持一致，这里作为Service的成员变量
-    // 注意：如果是多用户并发访问，每个用户应该有独立的路径状态。
-    // 简单的蜜罐系统可能不需要精细的用户会话管理，但实际应用中需要考虑。
-
     @Autowired
     private HttpLogMapper httpLogMapper;
     @Autowired

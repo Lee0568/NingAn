@@ -4,72 +4,283 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户管理 - 系统管理后台</title>
+    <style>
+        /* ========== 全局主题定义 ========== */
+        :root {
+            --primary-color: #3498db;
+            --primary-hover-color: #2980b9;
+            --success-color: #2ecc71;
+            --success-hover-color: #27ae60;
+            --warning-color: #f39c12;
+            --warning-hover-color: #e67e22;
+            --danger-color: #e74c3c;
+            --danger-hover-color: #c0392b;
+            --light-gray-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-color: #2c3e50;
+            --text-secondary-color: #555;
+            --background-color: #eef2f5;
+        }
+
+        /* ========== 页面结构 ========== */
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        #page-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ========== 卡片布局 ========== */
+        .card {
+            background-color: #fff;
+            border-radius: 14px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            padding: 30px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        /* ========== 标题栏 ========== */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+
+        .card-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* ========== 搜索栏样式 ========== */
+        .search-container {
+            display: flex;
+            align-items: center;
+            position: relative;
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .search-container input[type="text"] {
+            padding: 10px 15px 10px 40px;
+            border: none;
+            outline: none;
+            font-size: 15px;
+            width: 240px;
+        }
+
+        .search-container input[type="text"]:focus {
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            color: #999;
+        }
+
+        /* ========== 按钮样式 ========== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn svg { width: 16px; height: 16px; }
+
+        .btn:hover { transform: translateY(-1px); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), #3da2e6);
+            color: #fff;
+        }
+
+        .btn-primary:hover { background: var(--primary-hover-color); }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color), #41d883);
+            color: #fff;
+        }
+
+        .btn-success:hover { background: var(--success-hover-color); }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-color), #f5a623);
+            color: #fff;
+        }
+
+        .btn-warning:hover { background: var(--warning-hover-color); }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color), #ef5350);
+            color: #fff;
+        }
+
+        .btn-danger:hover { background: var(--danger-hover-color); }
+
+        /* ========== 表格样式 ========== */
+        .user-table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            margin-top: 6px;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            min-width: 800px;
+        }
+
+        .user-table th {
+            background-color: #f2f6fa;
+            padding: 14px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary-color);
+            font-size: 14px;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+
+        .user-table td {
+            padding: 14px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .user-table tbody tr:hover {
+            background-color: #f9fbfd;
+            transition: background-color 0.2s ease;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .action-buttons .btn {
+            padding: 7px 10px;
+            font-size: 13px;
+        }
+
+        /* ========== 分页控件 ========== */
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 18px;
+            gap: 8px;
+        }
+
+        .pagination button {
+            padding: 8px 14px;
+            background-color: #f2f3f5;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background-color: #e6e9ec;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #f8f9fa;
+        }
+
+        .pagination span {
+            font-size: 14px;
+            color: #555;
+            padding: 0 10px;
+        }
+
+        /* ========== 动画细节 ========== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        tbody tr { animation: fadeIn 0.18s ease; }
+    </style>
 </head>
 <body>
 <div id="page-content">
-    <style>
-        /* --- 样式部分保持不变 --- */
-        :root {
-            --primary-color: #3498db; --primary-hover-color: #2980b9;
-            --success-color: #2ecc71; --success-hover-color: #27ae60;
-            --warning-color: #f39c12; --warning-hover-color: #e67e22;
-            --danger-color: #e74c3c; --danger-hover-color: #c0392b;
-            --light-gray-color: #f8f9fa; --border-color: #e9ecef;
-            --text-color: #2c3e50; --text-secondary-color: #555;
-        }
-        .card { background-color: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); padding: 25px; margin-bottom: 20px; }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 15px; flex-wrap: wrap; }
-        .card-header h2 { font-size: 22px; color: var(--text-color); margin: 0; }
-        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .search-container { display: flex; position: relative; }
-        .search-container input[type="text"] { padding: 10px 15px 10px 40px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 15px; width: 250px; transition: border-color 0.3s, box-shadow 0.3s; }
-        .search-container input[type="text"]:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15); }
-        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #999; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 500; transition: background-color 0.3s ease, transform 0.1s ease; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
-        .btn:hover { transform: translateY(-1px); }
-        .btn svg { width: 16px; height: 16px; }
-        .btn-primary { background-color: var(--primary-color); color: white; }
-        .btn-primary:hover { background-color: var(--primary-hover-color); }
-        .btn-success { background-color: var(--success-color); color: white; }
-        .btn-success:hover { background-color: var(--success-hover-color); }
-        .user-table-container { overflow-x: auto; }
-        .user-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .user-table th, .user-table td { padding: 15px; border-bottom: 1px solid var(--border-color); text-align: left; font-size: 14px; vertical-align: middle; }
-        .user-table th { background-color: var(--light-gray-color); font-weight: 600; color: var(--text-secondary-color); white-space: nowrap; }
-        .user-table tbody tr:hover { background-color: #f5f7fa; }
-        .action-buttons { display: flex; gap: 8px; }
-        .action-buttons .btn { padding: 6px 12px; font-size: 13px; }
-        .btn-warning { background-color: var(--warning-color); color: white; }
-        .btn-warning:hover { background-color: var(--warning-hover-color); }
-        .btn-danger { background-color: var(--danger-color); color: white; }
-        .btn-danger:hover { background-color: var(--danger-hover-color); }
-        .pagination { display: flex; justify-content: flex-end; align-items: center; margin-top: 25px; gap: 5px; }
-        .pagination button { padding: 8px 15px; background-color: #e9ecef; color: #333; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 14px; transition: background-color 0.3s ease, border-color 0.3s ease; }
-        .pagination button:hover:not(:disabled) { background-color: #dee2e6; border-color: #c0c0c0; }
-        .pagination button:disabled { opacity: 0.6; cursor: not-allowed; background-color: #f5f5f5; color: #999; }
-        .pagination span { font-size: 14px; color: #555; padding: 0 10px; }
-    </style>
 
     <div class="card">
         <div class="card-header">
-            <h2>用户管理</h2>
+            <h2>员工管理</h2>
             <div class="header-actions">
                 <div class="search-container">
-                    <span class="search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg></span>
+                    <span class="search-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                             viewBox="0 0 16 16"><path
+                                d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+                    </span>
                     <input type="text" id="searchInput" placeholder="搜索用户名或邮箱...">
                     <button id="searchButton" class="btn btn-primary">搜索</button>
                 </div>
-                <button id="addEmployeeBtn" class="btn btn-success"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H1s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C9.516 10.68 8.289 10 6 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10zM13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/></svg> 添加员工</button>
+                <button id="addEmployeeBtn" class="btn btn-success">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                         viewBox="0 0 16 16"><path
+                            d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H1s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C9.516 10.68 8.289 10 6 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10zM13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/>
+                    </svg>
+                    添加员工
+                </button>
             </div>
         </div>
+
         <div class="user-table-container">
-            <table class="user-table">
+            <table class="user-table" role="table" aria-label="用户列表">
                 <thead>
-                <tr><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>注册日期</th><th>操作</th></tr>
+                <tr>
+                    <th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>注册日期</th><th>操作</th>
+                </tr>
                 </thead>
-                <tbody id="userTableBody"></tbody>
+                <tbody id="userTableBody">
+                <!-- JS 动态填充 -->
+                </tbody>
             </table>
         </div>
+
         <div class="pagination">
             <button id="prevPage">上一页</button>
             <span id="pageInfo"></span>
@@ -77,6 +288,7 @@
         </div>
     </div>
 
+    <!-- JS 逻辑：保留原功能，包含 Canvas 指纹、fetch、CRUD 与分页 -->
     <script>
         // --- 核心全局变量 ---
         let currentPage = 1;
@@ -87,38 +299,49 @@
         // --- Canvas指纹功能 (保持不变) ---
         async function getCanvasFingerprint() {
             return new Promise((resolve) => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?';
-                ctx.textBaseline = 'top';
-                ctx.font = '14px "Arial"';
-                ctx.textBaseline = 'alphabetic';
-                ctx.fillStyle = '#f60';
-                ctx.fillRect(125, 1, 62, 20);
-                ctx.fillStyle = '#069';
-                ctx.fillText(text, 2, 15);
-                ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
-                ctx.fillText(text, 4, 17);
-                const dataUrl = canvas.toDataURL();
-                const encoder = new TextEncoder();
-                const data = encoder.encode(dataUrl);
-                window.crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
-                    const hashArray = Array.from(new Uint8Array(hashBuffer));
-                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-                    resolve(hashHex);
-                }).catch(error => {
-                    console.error('Canvas 指纹哈希计算失败:', error);
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~1!2@3#4$5%6^7&8*9(0)-_=+[{]}\\|;:\'",<.>/?';
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px "Arial"';
+                    ctx.textBaseline = 'alphabetic';
+                    ctx.fillStyle = '#f60';
+                    ctx.fillRect(125, 1, 62, 20);
+                    ctx.fillStyle = '#069';
+                    ctx.fillText(text, 2, 15);
+                    ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
+                    ctx.fillText(text, 4, 17);
+                    const dataUrl = canvas.toDataURL();
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(dataUrl);
+                    window.crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
+                        const hashArray = Array.from(new Uint8Array(hashBuffer));
+                        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                        resolve(hashHex);
+                    }).catch(error => {
+                        console.error('Canvas 指纹哈希计算失败:', error);
+                        resolve(null);
+                    });
+                } catch (e) {
+                    console.error('生成 canvas 指纹失败:', e);
                     resolve(null);
-                });
+                }
             });
         }
 
-        // --- 数据获取与渲染 (已修改) ---
+        // 辅助：安全转义用于 onclick 内嵌的字符串 (避免破坏 JS 语法)
+        function escAttr(str) {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        // --- 数据获取与渲染 ---
         async function fetchAndRenderUsers(query = '', fingerprint) {
             const userTableBody = document.getElementById('userTableBody');
             userTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #666; padding: 20px;">正在加载用户数据...</td></tr>`;
 
-            // ✅ 将 canvasId 作为 URL 参数附加
+            // 将 canvasId 作为 URL 参数附加
             let apiUrl = `/api/userInfo/list?page=${currentPage}&limit=${usersPerPage}&canvasId=${fingerprint}`;
             if (query) {
                 apiUrl += `&query=${encodeURIComponent(query)}`;
@@ -136,23 +359,31 @@
                     userTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #777; padding: 20px;">没有找到用户。</td></tr>`;
                 } else {
                     usersToDisplay.forEach(user => {
-                        const row = userTableBody.insertRow();
+                        const row = document.createElement('tr');
+                        // 使用安全转义避免单引号/双引号导致的内联 onclick 错误
+                        const uid = user.id;
+                        const uname = escAttr(user.username);
+                        const uemail = escAttr(user.email);
+                        const urole = escAttr(user.role);
+                        const ureg = escAttr(user.regDate);
+
                         row.innerHTML = `
-                            <td>${user.id}</td>
-                            <td>${user.username}</td>
-                            <td>${user.email}</td>
-                            <td>${user.role}</td>
-                            <td>${user.regDate}</td>
+                            <td>${uid}</td>
+                            <td>${user.username ?? ''}</td>
+                            <td>${user.email ?? ''}</td>
+                            <td>${user.role ?? ''}</td>
+                            <td>${user.regDate ?? ''}</td>
                             <td>
                                 <div class="action-buttons">
-                                    <button class="btn btn-warning" onclick="editUser(${user.id}, '${user.username}', '${user.email}', '${user.role}')">
+                                    <button class="btn btn-warning" onclick="editUser(${uid}, '${uname}', '${uemail}', '${urole}')">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V12h2.293l6.5-6.5zm-8.468 5.657-1.036-1.036 1.036 1.036a.5.5 0 0 1 0 0z"/></svg> 编辑
                                     </button>
-                                    <button class="btn btn-danger" onclick="deleteUser(${user.id}, '${user.username}')">
+                                    <button class="btn btn-danger" onclick="deleteUser(${uid}, '${uname}')">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg> 删除
                                     </button>
                                 </div>
                             </td>`;
+                        userTableBody.appendChild(row);
                     });
                 }
                 updatePaginationControls();
@@ -166,19 +397,18 @@
             const prevPageButton = document.getElementById('prevPage');
             const nextPageButton = document.getElementById('nextPage');
             const pageInfoSpan = document.getElementById('pageInfo');
-            pageInfoSpan.textContent = `第 ${currentPage} / ${totalPages} 页 (共 ${totalUsersCount} 条)`;
+            pageInfoSpan.textContent = `第 ${currentPage} / ${totalPages || 1} 页 (共 ${totalUsersCount} 条)`;
             prevPageButton.disabled = currentPage <= 1;
-            nextPageButton.disabled = currentPage >= totalPages;
+            nextPageButton.disabled = currentPage >= (totalPages || 1);
         }
 
-        // --- 功能函数 (已修改) ---
+        // --- 功能函数 ---
 
         function handleSearch() {
             const query = document.getElementById('searchInput').value.trim();
             currentPage = 1;
             getCanvasFingerprint().then(fingerprint => {
                 console.log(`[搜索操作] Canvas 指纹 (canvasId): ${fingerprint}`);
-                // ✅ 将 fingerprint 传递给数据获取函数
                 fetchAndRenderUsers(query, fingerprint);
             });
         }
@@ -191,7 +421,7 @@
             const email = prompt("请输入新员工的邮箱:"); if (!email) return;
             const role = prompt("请输入新员工的角色:"); if (!role) return;
 
-            // ✅ 将 canvasId 添加到请求体中
+            // 将 canvasId 添加到请求体中
             const newUser = { username, email, role, canvasId: fingerprint };
 
             fetch('http://127.0.0.1:65535/api/userInfo/add', {
@@ -206,7 +436,7 @@
                         // 重新加载数据时再次传入指纹
                         getCanvasFingerprint().then(fp => fetchAndRenderUsers('', fp));
                     } else {
-                        alert('添加失败: ' + data.message);
+                        alert('添加失败: ' + (data.message || '未知错误'));
                     }
                 })
                 .catch(error => { console.error('添加员工时出错:', error); alert('操作失败，请检查网络连接。'); });
@@ -220,7 +450,7 @@
             const email = prompt("请输入新的邮箱:", currentEmail); if (!email) return;
             const role = prompt("请输入新的角色:", currentRole); if (!role) return;
 
-            // ✅ 将 canvasId 添加到请求体中
+            // 将 canvasId 添加到请求体中
             const updatedData = { username, email, role, canvasId: fingerprint };
 
             fetch(`http://127.0.0.1:65535/api/userInfo/update/${userId}`, {
@@ -234,7 +464,7 @@
                         alert('员工信息更新成功！');
                         getCanvasFingerprint().then(fp => fetchAndRenderUsers('', fp));
                     } else {
-                        alert('更新失败: ' + data.message);
+                        alert('更新失败: ' + (data.message || '未知错误'));
                     }
                 })
                 .catch(error => { console.error('更新员工时出错:', error); alert('操作失败，请检查网络连接。'); });
@@ -245,7 +475,7 @@
                 getCanvasFingerprint().then(fingerprint => {
                     console.log(`[删除用户 ${userId} 操作] Canvas 指纹 (canvasId): ${fingerprint}`);
 
-                    // ✅ 将 canvasId 作为 URL 参数附加
+                    // 将 canvasId 作为 URL 参数附加
                     fetch(`/api/userInfo/del/${userId}?canvasId=${fingerprint}`, {
                         method: 'DELETE'
                     })
@@ -255,7 +485,7 @@
                                 alert('员工删除成功！');
                                 getCanvasFingerprint().then(fp => fetchAndRenderUsers('', fp));
                             } else {
-                                alert('删除失败: ' + data.message);
+                                alert('删除失败: ' + (data.message || '未知错误'));
                             }
                         })
                         .catch(error => { console.error('删除员工时出错:', error); alert('操作失败，请检查网络连接。'); });
@@ -263,7 +493,7 @@
             }
         }
 
-        // --- 事件监听器 (已修改) ---
+        // --- 事件监听器 ---
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const searchButton = document.getElementById('searchButton');
@@ -294,9 +524,9 @@
 
             addEmployeeButton.addEventListener('click', addUser);
 
+            // 初始加载
             getCanvasFingerprint().then(fingerprint => {
                 console.log(`[页面加载完成] Canvas 指纹 (canvasId): ${fingerprint}`);
-                //初始加载时传递 fingerprint
                 fetchAndRenderUsers('', fingerprint);
             });
         });

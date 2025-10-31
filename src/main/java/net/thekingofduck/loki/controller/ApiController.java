@@ -16,6 +16,9 @@ import net.thekingofduck.loki.service.DeepSeekService;
 import net.thekingofduck.loki.service.HttpLogService; // 确保导入 HttpLogService
 import net.thekingofduck.loki.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
@@ -88,7 +91,8 @@ public class ApiController {
 
     @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
     @PostMapping("/httplog/userInfo")
-    public String recordHttpLog(@RequestBody HttpLogEntity httpLogEntity, HttpServletRequest request) {
+    public ResponseEntity<String> recordHttpLog(@RequestBody HttpLogEntity httpLogEntity, HttpServletRequest request) {
+
         String clientIp = getClientIp(request);
         httpLogEntity.setIp(clientIp);
         String utcTimeString = httpLogEntity.getTime();
@@ -107,12 +111,25 @@ public class ApiController {
         } else {
             Integer rows3 = httpLogMapper.addCanvasId(canvasId);
         }
+
         String username = httpLogEntity.getUsername();
         String password = httpLogEntity.getPassword();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON_UTF8);
+
+        String responseBody;
+
         if (username.equals("admin") && password.equals("123456")) {
-            return "success";
+            // 登录成功
+            String redirectUrl = "http://127.0.0.1:8080/admin/index.html";
+            responseBody = "{\"status\": \"success\", \"redirect_url\": \"" + redirectUrl + "\"}";
+        } else {
+            // 登录失败，确保中文字符串在 JSON 中
+            responseBody = "{\"status\": \"fail\", \"message\": \"用户名或密码错误，请重试。\"}";
         }
-        return "fail";
+
+        return new ResponseEntity<>(responseBody, headers, HttpStatus.OK);
     }
 
     @GetMapping("/userInfo/list")
