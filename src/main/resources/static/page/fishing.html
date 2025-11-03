@@ -393,7 +393,7 @@
                 
                 <hr style="margin: 20px 0;">
                 
-                <!-- 系统信息 -->
+                <!-- 系统信息
                 <div class="panel-title">
                     <i class="fa fa-info-circle"></i> 系统信息
                 </div>
@@ -404,6 +404,7 @@
                     <p><strong>网络连接:</strong> <span id="network-connections">--</span></p>
                     <p><strong>活跃攻击:</strong> <span id="active-attacks">--</span></p>
                 </div>
+                -->
             </div>
         </div>
     </div>
@@ -516,52 +517,41 @@
             var layer = layui.layer;
             var form = layui.form;
             
-            // 模拟数据
-            var honeypotServices = [
-                {
-                    id: 1,
-                    port: 8080,
-                    type: 'Web服务',
-                    template: 'default',
-                    status: 'running',
-                    uptime: '2天3小时',
-                    requests: 1247
-                },
-                {
-                    id: 2,
-                    port: 8090,
-                    type: 'Web服务', 
-                    template: 'admin',
-                    status: 'running',
-                    uptime: '1天12小时',
-                    requests: 856
-                },
-                {
-                    id: 3,
-                    port: 65535,
-                    type: 'Web服务',
-                    template: 'bee',
-                    status: 'running',
-                    uptime: '5小时30分',
-                    requests: 342
-                }
-            ];
+            // 服务数据（后端提供）
+            var honeypotServices = [];
+
+            // 拉取服务列表
+            function fetchServiceList(){
+                return fetch('/api/honeypot/services')
+                    .then(function(resp){ return resp.json(); })
+                    .then(function(json){
+                        if (json && json.success){
+                            honeypotServices = json.data || [];
+                        } else {
+                            layer.msg('获取服务列表失败', {icon: 2});
+                        }
+                    })
+                    .catch(function(){ layer.msg('网络错误，无法获取服务列表', {icon: 2}); });
+            }
             
             var templates = [
                 { name: 'default', icon: 'fa-globe', desc: '默认Web服务' },
                 { name: 'admin', icon: 'fa-user-secret', desc: '管理后台' },
                 { name: 'bee', icon: 'fa-bug', desc: 'Bee蜜罐' },
                 { name: 'ssh', icon: 'fa-terminal', desc: 'SSH服务' },
+                { name: 'sql', icon: 'fa-database', desc: 'SQL服务' },
                 { name: 'ftp', icon: 'fa-folder', desc: 'FTP服务' },
                 { name: 'custom', icon: 'fa-cogs', desc: '自定义' }
             ];
             
             // 初始化页面
             function init() {
-                updateOverviewCards();
-                renderServiceTable();
-                renderTemplateGrid();
-                startSystemMonitoring();
+                fetchServiceList().then(function(){
+                    updateOverviewCards();
+                    renderServiceTable();
+                    renderTemplateGrid();
+                    startSystemMonitoring();
+                });
             }
             
             // 更新概览卡片
@@ -570,15 +560,20 @@
                 var stopped = honeypotServices.filter(s => s.status === 'stopped').length;
                 var total = honeypotServices.length;
                 
-                document.getElementById('running-count').textContent = running;
-                document.getElementById('stopped-count').textContent = stopped;
-                document.getElementById('total-count').textContent = total;
-                document.getElementById('template-count').textContent = templates.length;
+                var rc = document.getElementById('running-count');
+                var sc = document.getElementById('stopped-count');
+                var tc = document.getElementById('total-count');
+                var tpc = document.getElementById('template-count');
+                if (rc) rc.textContent = running;
+                if (sc) sc.textContent = stopped;
+                if (tc) tc.textContent = total;
+                if (tpc && typeof templates !== 'undefined') tpc.textContent = templates.length;
             }
             
             // 渲染服务表格
             function renderServiceTable() {
                 var tbody = document.getElementById('service-tbody');
+                if (!tbody) return; // 页面未包含该区域时不渲染
                 tbody.innerHTML = '';
                 
                 honeypotServices.forEach(function(service) {
@@ -616,7 +611,7 @@
             // 渲染模板网格
             function renderTemplateGrid() {
                 var grid = document.getElementById('template-grid');
-                grid.innerHTML = '';
+                
                 
                 templates.forEach(function(template) {
                     var card = document.createElement('div');
@@ -641,68 +636,110 @@
             
             // 系统监控
             function startSystemMonitoring() {
+                var monitorTimer = null;
                 function updateSystemInfo() {
-                    // 模拟系统信息
-                    document.getElementById('cpu-usage').textContent = (Math.random() * 30 + 10).toFixed(1);
-                    document.getElementById('memory-usage').textContent = (Math.random() * 40 + 30).toFixed(1);
-                    document.getElementById('network-connections').textContent = Math.floor(Math.random() * 50 + 20);
-                    document.getElementById('active-attacks').textContent = Math.floor(Math.random() * 10 + 5);
+                    var cpuEl = document.getElementById('cpu-usage');
+                    var memEl = document.getElementById('memory-usage');
+                    var connEl = document.getElementById('network-connections');
+                    var atkEl = document.getElementById('active-attacks');
+                    // 如果页面不存在这些元素，则停止更新以避免报错
+                    if (!cpuEl && !memEl && !connEl && !atkEl) {
+                        if (monitorTimer) { try { clearInterval(monitorTimer); } catch(e){} }
+                        return;
+                    }
+                    fetch('/api/honeypot/metrics')
+                        .then(function(resp){ return resp.json(); })
+                        .then(function(json){
+                            if (json && json.success){
+                                var d = json.data || {};
+                                if (cpuEl) cpuEl.textContent = d.cpu || '--';
+                                if (memEl) memEl.textContent = d.memory || '--';
+                                if (connEl) connEl.textContent = d.connections || '--';
+                                if (atkEl) atkEl.textContent = d.attacks || '--';
+                            }
+                        })
+                        .catch(function(){});
                 }
                 
                 updateSystemInfo();
-                setInterval(updateSystemInfo, 5000);
+                monitorTimer = setInterval(updateSystemInfo, 5000);
             }
             
             // 服务操作函数
             window.startService = function(id) {
                 layer.load(2);
-                setTimeout(function() {
-                    var service = honeypotServices.find(s => s.id === id);
-                    if (service) {
-                        service.status = 'running';
-                        service.uptime = '刚刚启动';
-                        renderServiceTable();
-                        updateOverviewCards();
+                fetch(`/api/honeypot/services/${id}/start`, {method: 'POST'})
+                    .then(function(resp){ return resp.json(); })
+                    .then(function(json){
                         layer.closeAll('loading');
-                        layer.msg('服务启动成功', {icon: 1});
-                    }
-                }, 1000);
+                        if (json && json.success){
+                            fetchServiceList().then(function(){
+                                renderServiceTable();
+                                updateOverviewCards();
+                                layer.msg('服务启动成功', {icon: 1});
+                            });
+                        } else {
+                            layer.msg('启动失败', {icon: 2});
+                        }
+                    })
+                    .catch(function(){ layer.closeAll('loading'); layer.msg('网络错误', {icon: 2}); });
             };
             
             window.stopService = function(id) {
                 layer.confirm('确定要停止此服务吗？', function(index) {
                     layer.load(2);
-                    setTimeout(function() {
-                        var service = honeypotServices.find(s => s.id === id);
-                        if (service) {
-                            service.status = 'stopped';
-                            service.uptime = '--';
-                            renderServiceTable();
-                            updateOverviewCards();
+                    fetch(`/api/honeypot/services/${id}/stop`, {method: 'POST'})
+                        .then(function(resp){ return resp.json(); })
+                        .then(function(json){
                             layer.closeAll('loading');
-                            layer.msg('服务已停止', {icon: 1});
-                        }
-                    }, 500);
+                            if (json && json.success){
+                                fetchServiceList().then(function(){
+                                    renderServiceTable();
+                                    updateOverviewCards();
+                                    layer.msg('服务已停止', {icon: 1});
+                                });
+                            } else {
+                                layer.msg('停止失败', {icon: 2});
+                            }
+                        })
+                        .catch(function(){ layer.closeAll('loading'); layer.msg('网络错误', {icon: 2}); });
                     layer.close(index);
                 });
             };
             
+            var currentConfigId = null;
             window.configService = function(id) {
                 var service = honeypotServices.find(s => s.id === id);
                 if (service) {
+                    currentConfigId = id;
                     document.getElementById('config-port').value = service.port;
-                    document.getElementById('config-name').value = service.type;
-                    document.getElementById('config-type').value = 'web';
+                    document.getElementById('config-name').value = service.name || service.type;
+                    var t = (service.type || '').toLowerCase();
+                    var typeVal = 'web';
+                    if (t.indexOf('ssh') >= 0) typeVal = 'ssh';
+                    else if (t.indexOf('ftp') >= 0) typeVal = 'ftp';
+                    else if (t.indexOf('telnet') >= 0) typeVal = 'telnet';
+                    document.getElementById('config-type').value = typeVal;
                     document.getElementById('config-panel').style.display = 'block';
                 }
             };
             
             window.deleteService = function(id) {
                 layer.confirm('确定要删除此服务吗？删除后无法恢复！', function(index) {
-                    honeypotServices = honeypotServices.filter(s => s.id !== id);
-                    renderServiceTable();
-                    updateOverviewCards();
-                    layer.msg('服务已删除', {icon: 1});
+                    fetch(`/api/honeypot/services/${id}`, {method: 'DELETE'})
+                        .then(function(resp){ return resp.json(); })
+                        .then(function(json){
+                            if (json && json.success){
+                                fetchServiceList().then(function(){
+                                    renderServiceTable();
+                                    updateOverviewCards();
+                                    layer.msg('服务已删除', {icon: 1});
+                                });
+                            } else {
+                                layer.msg('删除失败', {icon: 2});
+                            }
+                        })
+                        .catch(function(){ layer.msg('网络错误', {icon: 2}); });
                     layer.close(index);
                 });
             };
@@ -719,36 +756,36 @@
                     return;
                 }
                 
-                if (honeypotServices.some(s => s.port == port)) {
-                    layer.msg('端口已被占用', {icon: 2});
-                    return;
-                }
-                
                 layer.load(2);
-                setTimeout(function() {
-                    var newService = {
-                        id: Date.now(),
-                        port: parseInt(port),
-                        type: name,
-                        template: selectedTemplate ? selectedTemplate.dataset.template : 'custom',
-                        status: 'running',
-                        uptime: '刚刚启动',
-                        requests: 0
-                    };
-                    
-                    honeypotServices.push(newService);
-                    renderServiceTable();
-                    updateOverviewCards();
-                    
-                    // 清空表单
-                    document.getElementById('deploy-port').value = '';
-                    document.getElementById('deploy-name').value = '';
-                    document.getElementById('deploy-desc').value = '';
-                    document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
-                    
-                    layer.closeAll('loading');
-                    layer.msg('蜜罐部署成功', {icon: 1});
-                }, 2000);
+                var payload = {
+                    port: parseInt(port),
+                    name: name,
+                    desc: desc,
+                    template: selectedTemplate ? selectedTemplate.dataset.template : 'custom',
+                    type: name
+                };
+                fetch('/api/honeypot/services', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                }).then(function(resp){ return resp.json(); })
+                  .then(function(json){
+                      layer.closeAll('loading');
+                      if (json && json.success){
+                          document.getElementById('deploy-port').value = '';
+                          document.getElementById('deploy-name').value = '';
+                          document.getElementById('deploy-desc').value = '';
+                          document.querySelectorAll('.template-card').forEach(function(c){ c.classList.remove('selected'); });
+                          fetchServiceList().then(function(){
+                              renderServiceTable();
+                              updateOverviewCards();
+                              layer.msg('蜜罐部署成功', {icon: 1});
+                          });
+                      } else {
+                          layer.msg(json && json.message ? json.message : '部署失败', {icon: 2});
+                      }
+                  })
+                  .catch(function(){ layer.closeAll('loading'); layer.msg('网络错误', {icon: 2}); });
             });
             
             // 批量操作
@@ -760,19 +797,16 @@
                 }
                 
                 layer.load(2);
-                setTimeout(function() {
-                    selected.forEach(function(id) {
-                        var service = honeypotServices.find(s => s.id === id);
-                        if (service) {
-                            service.status = 'running';
-                            service.uptime = '刚刚启动';
-                        }
-                    });
-                    renderServiceTable();
-                    updateOverviewCards();
-                    layer.closeAll('loading');
-                    layer.msg(`成功启动 ${selected.length} 个服务`, {icon: 1});
-                }, 1000);
+                Promise.all(selected.map(function(id){ return fetch(`/api/honeypot/services/${id}/start`, {method: 'POST'}); }))
+                    .then(function(){
+                        layer.closeAll('loading');
+                        fetchServiceList().then(function(){
+                            renderServiceTable();
+                            updateOverviewCards();
+                            layer.msg(`成功启动 ${selected.length} 个服务`, {icon: 1});
+                        });
+                    })
+                    .catch(function(){ layer.closeAll('loading'); layer.msg('网络错误', {icon: 2}); });
             });
             
             document.getElementById('batch-stop').addEventListener('click', function() {
@@ -784,19 +818,16 @@
                 
                 layer.confirm(`确定要停止 ${selected.length} 个服务吗？`, function(index) {
                     layer.load(2);
-                    setTimeout(function() {
-                        selected.forEach(function(id) {
-                            var service = honeypotServices.find(s => s.id === id);
-                            if (service) {
-                                service.status = 'stopped';
-                                service.uptime = '--';
-                            }
-                        });
-                        renderServiceTable();
-                        updateOverviewCards();
-                        layer.closeAll('loading');
-                        layer.msg(`成功停止 ${selected.length} 个服务`, {icon: 1});
-                    }, 500);
+                    Promise.all(selected.map(function(id){ return fetch(`/api/honeypot/services/${id}/stop`, {method: 'POST'}); }))
+                        .then(function(){
+                            layer.closeAll('loading');
+                            fetchServiceList().then(function(){
+                                renderServiceTable();
+                                updateOverviewCards();
+                                layer.msg(`成功停止 ${selected.length} 个服务`, {icon: 1});
+                            });
+                        })
+                        .catch(function(){ layer.closeAll('loading'); layer.msg('网络错误', {icon: 2}); });
                     layer.close(index);
                 });
             });
@@ -809,22 +840,27 @@
                 }
                 
                 layer.confirm(`确定要删除 ${selected.length} 个服务吗？删除后无法恢复！`, function(index) {
-                    honeypotServices = honeypotServices.filter(s => !selected.includes(s.id));
-                    renderServiceTable();
-                    updateOverviewCards();
-                    layer.msg(`成功删除 ${selected.length} 个服务`, {icon: 1});
+                    Promise.all(selected.map(function(id){ return fetch(`/api/honeypot/services/${id}`, {method: 'DELETE'}); }))
+                        .then(function(){
+                            fetchServiceList().then(function(){
+                                renderServiceTable();
+                                updateOverviewCards();
+                                layer.msg(`成功删除 ${selected.length} 个服务`, {icon: 1});
+                            });
+                        })
+                        .catch(function(){ layer.msg('网络错误', {icon: 2}); });
                     layer.close(index);
                 });
             });
             
             document.getElementById('refresh-list').addEventListener('click', function() {
                 layer.load(2);
-                setTimeout(function() {
+                fetchServiceList().then(function(){
                     renderServiceTable();
                     updateOverviewCards();
                     layer.closeAll('loading');
                     layer.msg('刷新完成', {icon: 1});
-                }, 500);
+                }).catch(function(){ layer.closeAll('loading'); layer.msg('刷新失败', {icon: 2}); });
             });
             
             // 获取选中的服务
@@ -843,8 +879,34 @@
             });
             
             document.getElementById('save-config').addEventListener('click', function() {
-                layer.msg('配置保存成功', {icon: 1});
-                document.getElementById('config-panel').style.display = 'none';
+                if (currentConfigId){
+                    var payload = {
+                        port: parseInt(document.getElementById('config-port').value),
+                        name: document.getElementById('config-name').value,
+                        type: document.getElementById('config-type').value
+                    };
+                    fetch(`/api/honeypot/services/${currentConfigId}/config`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    }).then(function(resp){ return resp.json(); })
+                      .then(function(json){
+                          if (json && json.success){
+                              layer.msg('配置保存成功', {icon: 1});
+                              fetchServiceList().then(function(){
+                                  renderServiceTable();
+                                  updateOverviewCards();
+                              });
+                          } else {
+                              layer.msg('配置保存失败', {icon: 2});
+                          }
+                          document.getElementById('config-panel').style.display = 'none';
+                          currentConfigId = null;
+                      })
+                      .catch(function(){ layer.msg('网络错误', {icon: 2}); document.getElementById('config-panel').style.display = 'none'; currentConfigId = null; });
+                } else {
+                    document.getElementById('config-panel').style.display = 'none';
+                }
             });
             
             // 选项卡切换

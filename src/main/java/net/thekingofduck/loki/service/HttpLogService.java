@@ -373,12 +373,30 @@ public class HttpLogService {
         int uniqueIpCount = uniqueIps.size();
         Set<String> attackTypes = new HashSet<>();
         for (HttpLogEntity log : allLogs) {
-            String attackType = analyzeLogForAttackType(log);
-            if (!"正常访问".equals(attackType)) {
-                attackTypes.add(attackType);
+            String body = log.getBody();
+            if (body == null || body.trim().isEmpty()) continue;
+            
+            for (AttackPattern pattern : attackPatterns) {
+                if (pattern.matches(body)) {
+                    attackTypes.add(pattern.getName());
+                }
             }
         }
-        int todayAttacks = Math.min(totalAttacks, (int) (totalAttacks * 0.3));
+        
+        // 统计今日攻击数
+        java.time.LocalDate today = java.time.LocalDate.now();
+        int todayAttacks = (int) allLogs.stream()
+                .filter(log -> {
+                    try {
+                        java.time.LocalDateTime logDateTime = java.time.LocalDateTime.parse(log.getTime(), java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                        return logDateTime.toLocalDate().isEqual(today);
+                    } catch (Exception e) {
+                        // 日志时间格式不正确，忽略此条日志
+                        return false;
+                    }
+                })
+                .count();
+        
         ObjectMapper objectMapper = new ObjectMapper();
         ObjectNode statsNode = objectMapper.createObjectNode();
         statsNode.put("totalAttacks", totalAttacks);
@@ -447,15 +465,33 @@ public class HttpLogService {
     }
 
     public String getAttackTrends() {
+        List<HttpLogEntity> allLogs = httpLogMapper.selectAllLogs();
+
+        // 统计每天的攻击次数
+        java.util.Map<java.time.LocalDate, Long> dailyAttackCounts = allLogs.stream()
+                .filter(log -> log.getTime() != null && !log.getTime().trim().isEmpty())
+                .map(log -> {
+                    try {
+                        return java.time.LocalDateTime.parse(log.getTime(), java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).toLocalDate();
+                    } catch (Exception e) {
+                        return null; // 忽略解析失败的日志
+                    }
+                })
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.groupingBy(java.util.function.Function.identity(), java.util.stream.Collectors.counting()));
+
         ObjectMapper objectMapper = new ObjectMapper();
         ArrayNode datesArray = objectMapper.createArrayNode();
         ArrayNode countsArray = objectMapper.createArrayNode();
-        LocalDate today = LocalDate.now();
-        java.util.Random random = new java.util.Random();
+        
+        java.time.LocalDate today = java.time.LocalDate.now();
+        
+        // 获取最近7天的数据，包括今天
         for (int i = 6; i >= 0; i--) {
-            LocalDate date = today.minusDays(i);
-            String dateStr = date.format(DateTimeFormatter.ofPattern("MM-dd"));
-            int count = random.nextInt(50) + 10;
+            java.time.LocalDate date = today.minusDays(i);
+            String dateStr = date.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"));
+            long count = dailyAttackCounts.getOrDefault(date, 0L);
+            
             datesArray.add(dateStr);
             countsArray.add(count);
         }

@@ -55,6 +55,9 @@ public class WebSSHHandler extends TextWebSocketHandler {
             sshSession = jSch.getSession(info.getUsername(), info.getHost(), info.getPort());
             sshSession.setPassword(info.getPassword());
             sshSession.setConfig("StrictHostKeyChecking", "no");
+            // 保活设置，提升连接稳定性
+            sshSession.setServerAliveInterval(30_000);
+            sshSession.setServerAliveCountMax(3);
             sshSession.connect(5000);
 
             channel = (ChannelShell) sshSession.openChannel("shell");
@@ -120,12 +123,37 @@ public class WebSSHHandler extends TextWebSocketHandler {
                 sshSessions.remove(session.getId());
             }
         } else {
+            // 尝试识别前端的控制消息（例如调整终端大小）
+            String payload = message.getPayload();
+            boolean handledControl = false;
             try {
-                s.transToSSH(message.getPayload());
-            } catch (IOException e) {
-                session.sendMessage(new TextMessage("命令发送失败: " + e.getMessage()));
-                session.close();
-                sshSessions.remove(session.getId());
+                // 简单判断是否为JSON对象
+                if (payload != null && payload.startsWith("{")) {
+                    Map<?,?> obj = JSON.parseObject(payload, Map.class);
+                    Object type = obj.get("type");
+                    if (type != null && "resize".equals(type.toString())) {
+                        // 终端尺寸调整
+                        Integer cols = safeInt(obj.get("cols"), 80);
+                        Integer rows = safeInt(obj.get("rows"), 24);
+                        if (s.channel != null && s.channel.isConnected()) {
+                            // 像素值可不填，由JSch估算，这里传0
+                            s.channel.setPtySize(cols, rows, 0, 0);
+                        }
+                        handledControl = true;
+                    }
+                }
+            } catch (Exception ignored) {
+                // 不是控制JSON，按普通输入处理
+            }
+
+            if (!handledControl) {
+                try {
+                    s.transToSSH(payload);
+                } catch (IOException e) {
+                    session.sendMessage(new TextMessage("命令发送失败: " + e.getMessage()));
+                    session.close();
+                    sshSessions.remove(session.getId());
+                }
             }
         }
     }
@@ -140,5 +168,15 @@ public class WebSSHHandler extends TextWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         Optional.ofNullable(sshSessions.remove(session.getId()))
                 .ifPresent(Session::close);
+    }
+
+    private Integer safeInt(Object v, int def) {
+        try {
+            if (v == null) return def;
+            if (v instanceof Number) return ((Number) v).intValue();
+            return Integer.parseInt(v.toString());
+        } catch (Exception e) {
+            return def;
+        }
     }
 }

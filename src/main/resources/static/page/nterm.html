@@ -7,6 +7,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <link rel="stylesheet" href="/layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
     <style>
         .terminal-container {
             padding: 15px;
@@ -164,7 +165,7 @@
                                         <button type="button" class="layui-btn" id="connect-btn" lay-submit lay-filter="connect">连接</button>
                                         <button type="button" class="layui-btn layui-btn-danger" id="disconnect-btn" style="display:none;">断开</button>
                                         <button type="button" class="layui-btn layui-btn-normal" id="save-server-btn" lay-submit lay-filter="save-server">保存</button>
-                                        <button type="button" class="layui-btn layui-btn-warm" id="show-input-btn" style="display:none;">显示输入框</button>
+                                        <!--<button type="button" class="layui-btn layui-btn-warm __web-inspector-hide-shortcut__" id="show-input-btn" style="display:none;">显示输入框</button>-->
                                     </div>
                                 </div>
                             </form>
@@ -184,6 +185,8 @@
 </div>
 
 <script src="/layui/layui.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script>
     layui.use(['form', 'jquery', 'layer'], function(){
         var $ = layui.jquery;
@@ -200,6 +203,25 @@
         
         // 获取终端元素
         const $terminal = $('#terminal-output');
+
+        // 使用 xterm.js 渲染终端
+        let term = new Terminal({
+            convertEol: true,
+            cursorBlink: true,
+            fontFamily: 'Consolas, Monaco, Courier New, monospace',
+            fontSize: 14,
+            theme: { background: '#1e1e1e' }
+        });
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal-output'));
+        fitAddon.fit();
+        // 通过 xterm 采集输入数据，直接发送到后端
+        term.onData(function(data){
+            if (isConnected && window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                window.terminalWebSocket.send(data);
+            }
+        });
         
         // 处理ANSI转义序列
         function processAnsiEscapes(text) {
@@ -455,6 +477,10 @@
                 password: password
             };
 
+            // 防抖：连接过程禁用按钮，直到建立或失败
+            $('#connect-btn').prop('disabled', true);
+            setTimeout(function(){ $('#connect-btn').prop('disabled', false); }, 5000);
+
             // 初始化WebSocket连接
             initWebSocket(connectInfo);
         });
@@ -603,210 +629,36 @@
         // 终端区域事件处理
         // 点击终端区域时聚焦
         $terminal.on('click', function() {
-            $(this).focus();
+            term.focus();
             console.log('终端被点击，已聚焦');
         });
         
         // 页面加载完成后确保终端能正确获取焦点
         $(document).ready(function() {
-            $terminal.attr('tabindex', '0').focus();
+            $terminal.attr('tabindex', '0');
+            term.focus();
             console.log('页面加载完成，终端已聚焦');
         });
 
-        // 处理粘贴事件
-        $terminal.on('paste', function(e) {
-            e.preventDefault();
-            if (!isConnected || !window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
-                return;
-            }
-            
-            let paste = (e.clipboardData || window.clipboardData).getData('text');
-            // 直接发送粘贴内容到SSH
-            window.terminalWebSocket.send(paste);
-        });
+        // xterm 自带粘贴支持，这里不再手动拦截 paste 事件
 
         // 终端键盘事件
-        $terminal.on('keydown', function(event) {
-            console.log('键盘事件触发:', event.key, '连接状态:', isConnected, '焦点状态:', $(this).is(':focus'));
-            
-            // 确保终端有焦点
-            if (!$(this).is(':focus')) {
-                $(this).focus();
-                console.log('重新聚焦终端');
-            }
-            
-            // 检查WebSocket状态，如果WebSocket不存在或未连接，重置连接状态
-            if (!window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
-                if (isConnected) {
-                    console.log('检测到WebSocket断开，重置连接状态');
-                    isConnected = false;
-                    $('#connect-btn').show();
-                    $('#disconnect-btn').hide();
-                }
-            }
-            
-            // 如果终端未连接，则不处理任何按键
-            if (!isConnected || !window.terminalWebSocket || window.terminalWebSocket.readyState !== WebSocket.OPEN) {
-                console.log('终端未连接，忽略按键');
-                console.log('详细状态 - isConnected:', isConnected, 'WebSocket存在:', !!window.terminalWebSocket, 'WebSocket状态:', window.terminalWebSocket ? window.terminalWebSocket.readyState : 'undefined');
-                // 允许F5刷新等系统快捷键
-                if (!(event.key === 'F5' || (event.ctrlKey && event.key === 'r'))) {
-                    event.preventDefault();
-                }
-                return;
-            }
-
-            // 处理回车键
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                
-                // 直接发送回车符到SSH
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\r');
-                }
-                return;
-            }
-
-            // 处理退格键
-            if (event.key === 'Backspace') {
-                event.preventDefault();
-                // 发送退格控制字符到SSH
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\b');
-                }
-                return;
-            }
-
-            // 处理删除键
-            if (event.key === 'Delete') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[3~'); // Delete键
-                }
-                return;
-            }
-
-            // 处理箭头键 - 发送ANSI转义序列
-            if (event.key === 'ArrowLeft') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[D'); // 左箭头
-                }
-                return;
-            }
-            if (event.key === 'ArrowRight') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[C'); // 右箭头
-                }
-                return;
-            }
-            if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[A'); // 上箭头
-                }
-                return;
-            }
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[B'); // 下箭头
-                }
-                return;
-            }
-
-            // 处理Tab键
-            if (event.key === 'Tab') {
-                event.preventDefault();
-                // 发送Tab字符到SSH
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\t');
-                }
-                return;
-            }
-
-            // 处理Home/End键 - 发送ANSI转义序列
-            if (event.key === 'Home') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[H'); // Home键
-                }
-                return;
-            }
-            if (event.key === 'End') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[F'); // End键
-                }
-                return;
-            }
-
-            // 处理Page Up/Page Down键
-            if (event.key === 'PageUp') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[5~'); // Page Up键
-                }
-                return;
-            }
-            if (event.key === 'PageDown') {
-                event.preventDefault();
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send('\x1b[6~'); // Page Down键
-                }
-                return;
-            }
-
-            // 处理Ctrl组合键
-            if (event.ctrlKey && event.key.length === 1) {
-                event.preventDefault();
-                const char = event.key.toLowerCase();
-                if (char >= 'a' && char <= 'z') {
-                    // 发送Ctrl+字母组合键（ASCII控制字符）
-                    const ctrlChar = String.fromCharCode(char.charCodeAt(0) - 'a'.charCodeAt(0) + 1);
-                    if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                        window.terminalWebSocket.send(ctrlChar);
-                        console.log('发送Ctrl+' + char.toUpperCase() + ':', ctrlChar.charCodeAt(0));
-                    }
-                }
-                return;
-            }
-
-            // 处理字符输入（只处理可见字符）
-            if (event.key.length === 1 && !event.ctrlKey && !event.altKey) {
-                event.preventDefault();
-                console.log('发送字符到SSH:', event.key);
-                // 直接发送字符到SSH
-                if (window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
-                    window.terminalWebSocket.send(event.key);
-                    console.log('字符已发送');
-                } else {
-                    console.log('WebSocket未连接');
-                }
-                return;
-            }
-
-            // 阻止其他控制键的默认行为
-            if (!(event.key === 'F5' || (event.ctrlKey && event.key === 'r'))) {
-                event.preventDefault();
-            }
-        });
+        // 键盘事件交由 xterm 处理，移除自定义 keydown 逻辑
 
         function initWebSocket(connectInfo) {
             if (window.terminalWebSocket) {
                 window.terminalWebSocket.close();
             }
 
-            const ws = new WebSocket('ws://' + window.location.host + '/ssh-terminal');
+            const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const ws = new WebSocket(proto + '://' + window.location.host + '/ssh-terminal');
             window.terminalWebSocket = ws;
 
             ws.onopen = function(event) {
                 console.log('WebSocket连接已建立');
                 console.log('WebSocket readyState:', ws.readyState);
-                $terminal.empty(); // 清空终端
-                $terminal.append('正在连接到 ' + connectInfo.host + '...\n');
-                scrollToBottom();
+                term.clear();
+                term.writeln('正在连接到 ' + connectInfo.host + '...');
 
                 // 发送连接信息到后端
                 ws.send(JSON.stringify(connectInfo));
@@ -820,31 +672,26 @@
                 console.log('当前WebSocket readyState:', ws.readyState);
                 
                 // 聚焦到终端区域
-                $terminal.focus();
-                
-                // 确保终端能接收键盘事件
-                $terminal.attr('tabindex', '0');
-                $terminal.focus();
-                console.log('终端已聚焦');
+                term.focus();
+
+                // 初始适配并上报终端尺寸
+                fitAddon.fit();
+                try {
+                    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+                } catch (e) {}
             };
 
             ws.onmessage = function(event) {
-                // 处理ANSI转义序列并添加SSH输出内容
-                const processedData = processAnsiEscapes(event.data);
-                $terminal.append(processedData);
-                scrollToBottom();
-                
-                // 确保终端保持焦点
-                if (!$terminal.is(':focus')) {
-                    $terminal.focus();
-                }
+                // 交由 xterm 渲染输出（包含 ANSI 支持）
+                term.write(event.data);
             };
 
             ws.onclose = function(event) {
                 console.log('WebSocket连接关闭，事件:', event);
-                $terminal.append('\n连接已断开。\n');
-                scrollToBottom();
+                term.writeln('');
+                term.writeln('连接已断开。');
                 $('#connect-btn').show();
+                $('#connect-btn').prop('disabled', false);
                 $('#disconnect-btn').hide();
                 $('#show-input-btn').hide();
                 $('#input-fallback').hide();
@@ -856,6 +703,7 @@
             ws.onerror = function(error) {
                 console.log('WebSocket错误:', error);
                 $terminal.append('WebSocket错误: ' + error + '\n');
+                $('#connect-btn').prop('disabled', false);
                 scrollToBottom();
             };
         }
@@ -864,7 +712,7 @@
 
         // 滚动到底部
         function scrollToBottom() {
-            $terminal.scrollTop($terminal[0].scrollHeight);
+            // xterm 会自动滚动到底部，无需手动处理
         }
         
         // 初始化加载服务器列表
@@ -872,7 +720,8 @@
         
         // 页面加载完成后确保终端能正确获取焦点
         setTimeout(function() {
-            $terminal.attr('tabindex', '0').focus();
+            $terminal.attr('tabindex', '0');
+            term.focus();
         }, 100);
         
         // 添加全局键盘事件监听作为备用方案
@@ -885,10 +734,17 @@
                 console.log('全局键盘事件捕获:', event.key);
                 
                 // 确保终端获得焦点
-                $terminal.focus();
-                
-                // 触发终端的键盘事件处理
-                $terminal.trigger(event);
+                term.focus();
+            }
+        });
+
+        // 监听窗口尺寸变化，适配并上报尺寸
+        window.addEventListener('resize', function(){
+            fitAddon.fit();
+            if (isConnected && window.terminalWebSocket && window.terminalWebSocket.readyState === WebSocket.OPEN) {
+                try {
+                    window.terminalWebSocket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+                } catch (e) {}
             }
         });
     });

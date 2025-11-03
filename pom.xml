@@ -115,6 +115,13 @@
 <!--            <artifactId>spring-boot-starter-actuator</artifactId>-->
 <!--        </dependency>-->
 
+        <!-- 协议级 SSH 蜜罐所需的 Apache Mina SSHD -->
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+
     </dependencies>
 
     <build>

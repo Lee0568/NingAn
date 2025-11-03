@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>自定义蜜罐模板</title>
+  <style>
+    body {font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif; margin:0; background:#0b0f17; color:#e8eaf0;}
+    .wrap {max-width: 920px; margin: 48px auto; padding: 24px;}
+    .card {background:#121826; border:1px solid #1f2937; border-radius:12px; padding:24px;}
+    h1 {font-size: 20px; margin:0 0 12px;}
+    p {line-height: 1.6; color:#b7c0d6;}
+    .kbd {background:#0d1220; border:1px solid #202a3b; border-radius:6px; padding:2px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;}
+    .grid {display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px; margin-top: 16px;}
+    .item {background:#0d1324; border:1px solid #182136; border-radius:10px; padding:16px;}
+    .muted {color:#8fa3bf;}
+    .footer {margin-top: 16px; font-size: 12px; color:#7b8ca9;}
+    @media (max-width: 700px) { .grid {grid-template-columns: 1fr;} }
+  </style>
+  <script>
+    // 轻量诱饵交互（无依赖）
+    function fakeLogin(ev){
+      ev && ev.preventDefault();
+      const u = document.getElementById('u').value.trim();
+      const p = document.getElementById('p').value.trim();
+      const msg = document.getElementById('msg');
+      if (!u || !p){ msg.textContent = '请输入用户名与密码'; msg.style.color = '#ff9aa2'; return; }
+      // 伪反馈（后端会记录访问日志与请求头）
+      msg.textContent = '用户名或密码错误';
+      msg.style.color = '#ffd37b';
+    }
+  </script>
+  <!-- 常见服务特征：伪造 Server/X-Powered-By 由后端响应头注入 -->
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>自定义蜜罐模板</h1>
+      <p class="muted">此页面用于动态部署的 Web 蜜罐。你可以在管理界面选择 <span class="kbd">custom</span> 模板，并指定端口进行部署与启停。</p>
+      <div class="grid">
+        <div class="item">
+          <h2 style="font-size:16px;margin:0 0 8px;">伪登录入口</h2>
+          <form onsubmit="fakeLogin(event)">
+            <div style="margin-bottom:8px;">
+              <label>用户名</label>
+              <input id="u" type="text" style="width:100%;padding:8px;border-radius:6px;border:1px solid #223047;background:#0a1120;color:#e8eaf0;">
+            </div>
+            <div style="margin-bottom:8px;">
+              <label>密码</label>
+              <input id="p" type="password" style="width:100%;padding:8px;border-radius:6px;border:1px solid #223047;background:#0a1120;color:#e8eaf0;">
+            </div>
+            <button type="submit" style="padding:8px 12px;border-radius:6px;background:#1e66f5;border:0;color:white;cursor:pointer;">登录</button>
+            <span id="msg" style="margin-left:8px;"></span>
+          </form>
+        </div>
+        <div class="item">
+          <h2 style="font-size:16px;margin:0 0 8px;">诱饵信息</h2>
+          <p>常见路径：<span class="kbd">/admin</span>、<span class="kbd">/login</span>、<span class="kbd">/api</span></p>
+          <p>常见技术栈暴露：<span class="kbd">Server</span>、<span class="kbd">X-Powered-By</span>、<span class="kbd">Set-Cookie</span></p>
+        </div>
+      </div>
+      <div class="footer">静态资源可按需放置于 <span class="kbd">/resources/statics/</span> 并在配置中启用。</div>
+    </div>
+  </div>
+</body>
+<script>
+  // 轻量访问标记（便于与后端日志关联）
+  (function(){ try { console.log('custom template online'); } catch(e){} })();
+</script>
+</html>

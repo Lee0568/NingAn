@@ -36,7 +36,43 @@ public class SshFileController {
     public ResponseEntity<?> listFiles(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
         return getFiles(request, httpRequest);
     }
-    
+
+    /**
+     * 查看文件内容（前端兼容接口）
+     * 兼容前端使用的 path 字段并返回纯文本内容
+     */
+    @PostMapping("/view")
+    public ResponseEntity<?> viewFile(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        String clientIp = getClientIpAddress(httpRequest);
+        logger.info("查看文件请求 - 客户端IP: {}", clientIp);
+
+        try {
+            String host = (String) request.get("host");
+            Integer port = (Integer) request.get("port");
+            String username = (String) request.get("username");
+            String password = (String) request.get("password");
+            // 前端传入的键为 path，这里做兼容处理
+            String filePath = (String) request.get("path");
+
+            if (host == null || port == null || username == null || password == null || filePath == null) {
+                logger.warn("查看文件失败 - 缺少必要参数, 客户端IP: {}", clientIp);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "缺少必要参数", "code", "MISSING_PARAMS"));
+            }
+
+            logger.info("开始查看文件 - 主机: {}:{}, 用户: {}, 路径: {}, 客户端IP: {}", host, port, username, filePath, clientIp);
+            String content = sshFileService.getFileContent(host, port, username, password, filePath);
+
+            logAuditEvent("VIEW_FILE", host, port, username, "路径: " + filePath + ", 内容长度: " + content.length() + "字符", clientIp, true);
+            logger.info("查看文件成功 - 主机: {}:{}, 路径: {}, 内容长度: {}字符, 客户端IP: {}", host, port, filePath, content.length(), clientIp);
+
+            return ResponseEntity.ok(Map.of("success", true, "data", content, "message", "查看文件成功", "code", "SUCCESS"));
+
+        } catch (Exception e) {
+            logger.error("查看文件失败 - 客户端IP: {}, 错误: {}", clientIp, e.getMessage(), e);
+            return ResponseEntity.ok(Map.of("success", false, "message", "查看文件失败: " + e.getMessage(), "code", "VIEW_FAILED"));
+        }
+    }
+
     /**
      * 列出目录文件 (前端兼容接口)
      */
@@ -132,6 +168,9 @@ public class SshFileController {
             String username = (String) request.get("username");
             String password = (String) request.get("password");
             String filePath = (String) request.get("filePath");
+            if (filePath == null || filePath.trim().isEmpty()) {
+                filePath = (String) request.get("path");
+            }
             
             if (host == null || port == null || username == null || password == null || filePath == null) {
                 logger.warn("下载文件失败 - 缺少必要参数, 客户端IP: {}", clientIp);
@@ -156,6 +195,178 @@ public class SshFileController {
             return ResponseEntity.ok(Map.of("success", false, "message", "文件下载失败: " + e.getMessage(), "code", "DOWNLOAD_FAILED"));
         }
     }
+
+    /**
+     * 下载文件（前端兼容：GET + query 参数，使用 path 字段）
+     */
+    @GetMapping("/download")
+    public ResponseEntity<?> downloadFileGet(
+            @RequestParam("host") String host,
+            @RequestParam("port") Integer port,
+            @RequestParam("username") String username,
+            @RequestParam("password") String password,
+            @RequestParam("path") String path,
+            HttpServletRequest httpRequest
+    ) {
+        String clientIp = getClientIpAddress(httpRequest);
+        logger.info("下载文件请求(GET) - 客户端IP: {}", clientIp);
+
+        try {
+            if (host == null || port == null || username == null || password == null || path == null) {
+                logger.warn("下载文件失败(GET) - 缺少必要参数, 客户端IP: {}", clientIp);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "缺少必要参数", "code", "MISSING_PARAMS"));
+            }
+
+            logger.info("开始下载文件(GET) - 主机: {}:{}, 用户: {}, 路径: {}, 客户端IP: {}", host, port, username, path, clientIp);
+            byte[] fileData = sshFileService.downloadFile(host, port, username, password, path);
+
+            String fileName = getFileName(path);
+
+            logAuditEvent("DOWNLOAD_FILE", host, port, username, "路径: " + path + ", 大小: " + fileData.length + "字节", clientIp, true);
+            logger.info("下载文件成功(GET) - 主机: {}:{}, 路径: {}, 大小: {}字节, 客户端IP: {}", host, port, path, fileData.length, clientIp);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(fileData);
+
+        } catch (Exception e) {
+            logger.error("下载文件失败(GET) - 客户端IP: {}, 错误: {}", clientIp, e.getMessage(), e);
+            return ResponseEntity.ok(Map.of("success", false, "message", "文件下载失败: " + e.getMessage(), "code", "DOWNLOAD_FAILED"));
+        }
+    }
+
+    /**
+     * 创建目录（兼容前端 path + name）
+     */
+    @PostMapping("/mkdir")
+    public ResponseEntity<?> mkdir(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        String clientIp = getClientIpAddress(httpRequest);
+        logger.info("创建目录请求 - 客户端IP: {}", clientIp);
+
+        try {
+            String host = (String) request.get("host");
+            Integer port = (Integer) request.get("port");
+            String username = (String) request.get("username");
+            String password = (String) request.get("password");
+            String path = (String) request.get("path");
+            String name = (String) request.get("name");
+
+            if (host == null || port == null || username == null || password == null || path == null || name == null) {
+                logger.warn("创建目录失败 - 缺少必要参数, 客户端IP: {}", clientIp);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "缺少必要参数", "code", "MISSING_PARAMS"));
+            }
+
+            logger.info("开始创建目录 - 主机: {}:{}, 用户: {}, 路径: {}, 名称: {}, 客户端IP: {}", host, port, username, path, name, clientIp);
+            boolean ok = sshFileService.createDirectory(host, port, username, password, path, name);
+
+            logAuditEvent("MKDIR", host, port, username, "路径: " + path + ", 名称: " + name, clientIp, ok);
+            logger.info("创建目录{} - 主机: {}:{}, 路径: {}, 名称: {}, 客户端IP: {}", ok ? "成功" : "失败", host, port, path, name, clientIp);
+            String createdPath = (path != null && path.endsWith("/")) ? (path + name) : (path + "/" + name);
+            return ResponseEntity.ok(Map.of(
+                    "success", ok,
+                    "message", ok ? "创建目录成功" : "创建目录失败",
+                    "code", ok ? "SUCCESS" : "MKDIR_FAILED",
+                    "data", Map.of("path", createdPath)
+            ));
+        } catch (Exception e) {
+            String raw = e.getMessage() == null ? "" : e.getMessage();
+            String code = "MKDIR_FAILED";
+            String userMsg = "创建目录失败";
+            String lower = raw.toLowerCase();
+
+            if (raw.contains("目录名不能为空")) {
+                code = "INVALID_NAME";
+                userMsg = "目录名不能为空";
+            } else if (raw.contains("已存在")) {
+                code = "ALREADY_EXISTS";
+                userMsg = "目录已存在";
+            } else if (lower.contains("permission denied") || raw.contains("权限")) {
+                code = "PERMISSION_DENIED";
+                userMsg = "没有权限创建目录";
+            } else if (lower.contains("no such file") || raw.contains("不存在")) {
+                code = "NOT_FOUND";
+                userMsg = "路径不存在";
+            } else if (raw.contains("路径") && (raw.contains("危险") || raw.contains("非法") || raw.contains("不合法"))) {
+                code = "INVALID_PATH";
+                userMsg = "路径不合法";
+            }
+
+            logger.error("创建目录失败 - 客户端IP: {}, 错误: {}", clientIp, raw, e);
+            return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "message", userMsg,
+                    "code", code,
+                    "details", raw
+            ));
+        }
+    }
+
+    /**
+     * 重命名（兼容前端 oldPath + newPath，内部提取 newName）
+     */
+    @PostMapping("/rename")
+    public ResponseEntity<?> rename(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        String clientIp = getClientIpAddress(httpRequest);
+        logger.info("重命名请求 - 客户端IP: {}", clientIp);
+
+        try {
+            String host = (String) request.get("host");
+            Integer port = (Integer) request.get("port");
+            String username = (String) request.get("username");
+            String password = (String) request.get("password");
+            String oldPath = (String) request.get("oldPath");
+            String newPath = (String) request.get("newPath");
+
+            if (host == null || port == null || username == null || password == null || oldPath == null || newPath == null) {
+                logger.warn("重命名失败 - 缺少必要参数, 客户端IP: {}", clientIp);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "缺少必要参数", "code", "MISSING_PARAMS"));
+            }
+
+            String newName = getFileName(newPath);
+            logger.info("开始重命名 - 主机: {}:{}, 用户: {}, 旧路径: {}, 新名称: {}, 客户端IP: {}", host, port, username, oldPath, newName, clientIp);
+            boolean ok = sshFileService.renameFile(host, port, username, password, oldPath, newName);
+
+            logAuditEvent("RENAME", host, port, username, "旧路径: " + oldPath + ", 新名称: " + newName, clientIp, ok);
+            logger.info("重命名{} - 主机: {}:{}, 旧路径: {}, 新名称: {}, 客户端IP: {}", ok ? "成功" : "失败", host, port, oldPath, newName, clientIp);
+
+            return ResponseEntity.ok(Map.of("success", ok, "message", ok ? "重命名成功" : "重命名失败", "code", ok ? "SUCCESS" : "RENAME_FAILED"));
+        } catch (Exception e) {
+            logger.error("重命名失败 - 客户端IP: {}, 错误: {}", clientIp, e.getMessage(), e);
+            return ResponseEntity.ok(Map.of("success", false, "message", "重命名失败: " + e.getMessage(), "code", "RENAME_FAILED"));
+        }
+    }
+
+    /**
+     * 断开连接（兼容前端只传主机、端口、用户名）
+     */
+    @PostMapping("/disconnect")
+    public ResponseEntity<?> disconnect(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        String clientIp = getClientIpAddress(httpRequest);
+        logger.info("断开连接请求 - 客户端IP: {}", clientIp);
+
+        try {
+            String host = (String) request.get("host");
+            Integer port = (Integer) request.get("port");
+            String username = (String) request.get("username");
+
+            if (host == null || port == null || username == null) {
+                logger.warn("断开连接失败 - 缺少必要参数, 客户端IP: {}", clientIp);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "缺少必要参数", "code", "MISSING_PARAMS"));
+            }
+
+            logger.info("开始断开连接 - 主机: {}:{}, 用户: {}, 客户端IP: {}", host, port, username, clientIp);
+            sshFileService.disconnect(host, port, username);
+
+            logAuditEvent("DISCONNECT", host, port, username, "手动断开连接", clientIp, true);
+            logger.info("断开连接成功 - 主机: {}:{}, 用户: {}, 客户端IP: {}", host, port, username, clientIp);
+
+            return ResponseEntity.ok(Map.of("success", true, "message", "断开连接成功", "code", "SUCCESS"));
+        } catch (Exception e) {
+            logger.error("断开连接失败 - 客户端IP: {}, 错误: {}", clientIp, e.getMessage(), e);
+            return ResponseEntity.ok(Map.of("success", false, "message", "断开连接失败: " + e.getMessage(), "code", "DISCONNECT_FAILED"));
+        }
+    }
     
     /**
      * 删除文件
@@ -170,7 +381,11 @@ public class SshFileController {
             Integer port = (Integer) request.get("port");
             String username = (String) request.get("username");
             String password = (String) request.get("password");
+            // 兼容前端传递的 path 键
             String filePath = (String) request.get("filePath");
+            if (filePath == null || filePath.trim().isEmpty()) {
+                filePath = (String) request.get("path");
+            }
             
             if (host == null || port == null || username == null || password == null || filePath == null) {
                 logger.warn("删除文件失败 - 缺少必要参数, 客户端IP: {}", clientIp);
@@ -205,6 +420,9 @@ public class SshFileController {
             String username = (String) request.get("username");
             String password = (String) request.get("password");
             String filePath = (String) request.get("filePath");
+            if (filePath == null || filePath.trim().isEmpty()) {
+                filePath = (String) request.get("path");
+            }
             
             if (host == null || port == null || username == null || password == null || filePath == null) {
                 logger.warn("获取文件内容失败 - 缺少必要参数, 客户端IP: {}", clientIp);
@@ -224,6 +442,44 @@ public class SshFileController {
             return ResponseEntity.ok(Map.of("success", false, "message", "获取文件内容失败: " + e.getMessage(), "code", "GET_CONTENT_FAILED"));
         }
     }
+
+    /**
+     * 保存文件内容（文本文件在线编辑）
+     */
+    @PostMapping("/save")
+    public ResponseEntity<?> saveFile(@RequestBody Map<String, Object> request, HttpServletRequest httpRequest) {
+        String clientIp = getClientIpAddress(httpRequest);
+        logger.info("保存文件请求 - 客户端IP: {}", clientIp);
+
+        try {
+            String host = (String) request.get("host");
+            Integer port = (Integer) request.get("port");
+            String username = (String) request.get("username");
+            String password = (String) request.get("password");
+            String filePath = (String) request.get("filePath");
+            if (filePath == null || filePath.trim().isEmpty()) {
+                filePath = (String) request.get("path");
+            }
+            String content = (String) request.get("content");
+
+            if (host == null || port == null || username == null || password == null || filePath == null || content == null) {
+                logger.warn("保存文件失败 - 缺少必要参数, 客户端IP: {}", clientIp);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "缺少必要参数", "code", "MISSING_PARAMS"));
+            }
+
+            logger.info("开始保存文件 - 主机: {}:{}, 用户: {}, 路径: {}, 内容长度: {}字符, 客户端IP: {}", host, port, username, filePath, content.length(), clientIp);
+            boolean ok = sshFileService.saveFileContent(host, port, username, password, filePath, content);
+
+            logAuditEvent("SAVE_FILE", host, port, username, "路径: " + filePath + ", 内容长度: " + content.length() + "字符", clientIp, ok);
+            logger.info("保存文件{} - 主机: {}:{}, 路径: {}, 客户端IP: {}", ok ? "成功" : "失败", host, port, filePath, clientIp);
+
+            return ResponseEntity.ok(Map.of("success", ok, "message", ok ? "保存成功" : "保存失败", "code", ok ? "SUCCESS" : "SAVE_FAILED"));
+        } catch (Exception e) {
+            String raw = e.getMessage();
+            logger.error("保存文件失败 - 客户端IP: {}, 错误: {}", clientIp, raw, e);
+            return ResponseEntity.ok(Map.of("success", false, "message", "保存文件失败: " + e.getMessage(), "code", "SAVE_FAILED"));
+        }
+    }
     
     /**
      * 文件预览
@@ -239,6 +495,9 @@ public class SshFileController {
             String username = (String) request.get("username");
             String password = (String) request.get("password");
             String filePath = (String) request.get("filePath");
+            if (filePath == null || filePath.trim().isEmpty()) {
+                filePath = (String) request.get("path");
+            }
             
             if (host == null || port == null || username == null || password == null || filePath == null) {
                 logger.warn("文件预览失败 - 缺少必要参数, 客户端IP: {}", clientIp);

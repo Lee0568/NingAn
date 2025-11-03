@@ -148,6 +148,12 @@
                             <button type="button" class="layui-btn layui-btn-sm layui-btn-warm" id="mkdir-btn">
                                 <i class="layui-icon layui-icon-add-1"></i> 新建文件夹
                             </button>
+                            <button type="button" class="layui-btn layui-btn-sm" id="batch-download-btn">
+                                <i class="layui-icon layui-icon-download-circle"></i> 批量下载
+                            </button>
+                            <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" id="clear-selection-btn">
+                                <i class="layui-icon layui-icon-close"></i> 清空选择
+                            </button>
                             <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="disconnect-file-btn">
                                 <i class="layui-icon layui-icon-close"></i> 断开连接
                             </button>
@@ -572,9 +578,15 @@
                 const isDir = file.type === 'directory';
                 const icon = isDir ? 'layui-icon-folder' : 'layui-icon-file';
                 const size = isDir ? '-' : formatFileSize(file.size);
+                const ext = (file.name.split('.').pop() || '').toLowerCase();
+                const isPreviewable = !isDir && (["png","jpg","jpeg","gif","bmp","webp","tiff","svg","pdf"]).includes(ext);
+                const isEditable = !isDir && (["txt","log","md","json","xml","html","css","js","java","py","cpp","c","h","php","sql","ssh","yml","yaml","properties","conf","cfg","ini"]).includes(ext);
                 
                 const fileItem = $(`
                     <div class="file-item" data-path="${file.path}" data-type="${file.type}" data-name="${file.name}">
+                        <div style="margin-right:8px;display:flex;align-items:center;">
+                            <input type="checkbox" class="file-select-checkbox" ${isDir ? 'disabled' : ''} />
+                        </div>
                         <div class="file-icon">
                             <i class="layui-icon ${icon}"></i>
                         </div>
@@ -586,6 +598,8 @@
                             <button class="layui-btn layui-btn-xs layui-btn-normal rename-file-btn" title="重命名"><i class="layui-icon layui-icon-edit"></i></button>
                             ${file.type === 'file' ? '<button class="layui-btn layui-btn-xs download-file-btn" title="下载"><i class="layui-icon layui-icon-download-circle"></i></button>' : ''}
                             ${file.type === 'file' ? '<button class="layui-btn layui-btn-xs layui-btn-warm view-file-btn" title="查看"><i class="layui-icon layui-icon-file"></i></button>' : ''}
+                            ${isPreviewable ? '<button class="layui-btn layui-btn-xs layui-btn-primary preview-file-btn" title="预览"><i class="layui-icon layui-icon-picture"></i></button>' : ''}
+                            ${isEditable ? '<button class="layui-btn layui-btn-xs layui-btn-normal edit-file-btn" title="编辑"><i class="layui-icon layui-icon-edit"></i></button>' : ''}
                         </div>
                     </div>
                 `);
@@ -597,6 +611,10 @@
             $('.file-item').on('click', function(e) {
                 // 如果点击的是操作按钮，不触发文件夹进入事件
                 if ($(e.target).closest('.file-actions').length > 0) {
+                    return;
+                }
+                // 点击复选框不触发进入目录
+                if ($(e.target).is('.file-select-checkbox')) {
                     return;
                 }
                 
@@ -642,6 +660,20 @@
                 const $fileItem = $(this).closest('.file-item');
                 const fileName = $fileItem.data('name');
                 viewFile(fileName);
+            });
+            // 绑定预览按钮事件
+            $('.preview-file-btn').on('click', function(e) {
+                e.stopPropagation();
+                const $fileItem = $(this).closest('.file-item');
+                const fileName = $fileItem.data('name');
+                previewFile(fileName);
+            });
+            // 绑定编辑按钮事件
+            $('.edit-file-btn').on('click', function(e) {
+                e.stopPropagation();
+                const $fileItem = $(this).closest('.file-item');
+                const fileName = $fileItem.data('name');
+                editFile(fileName);
             });
         }
         
@@ -698,14 +730,26 @@
             
             layer.open({
                 type: 1,
-                title: '上传文件',
-                content: '<div id="upload-area" style="padding: 20px; text-align: center; border: 2px dashed #ccc; margin: 10px; border-radius: 4px;"><i class="layui-icon layui-icon-upload" style="font-size: 30px; color: #ccc;"></i><br><br>点击或拖拽文件到此处上传</div>',
-                area: ['450px', '250px'],
+                title: '上传文件（可多选）',
+                area: ['600px', '420px'],
+                content: '<div style="padding:10px;">'
+                    + '<div id="upload-area" style="padding: 20px; text-align: center; border: 2px dashed #ccc; margin: 10px; border-radius: 4px;">'
+                    + '<i class="layui-icon layui-icon-upload" style="font-size: 30px; color: #ccc;"></i><br><br>点击或拖拽文件到此处选择'
+                    + '</div>'
+                    + '<div style="padding:10px 0;">'
+                    + '<table class="layui-table" id="upload-list-table"><thead><tr><th>文件名</th><th>大小</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table>'
+                    + '</div>'
+                    + '<div style="text-align:right;"><button class="layui-btn layui-btn-sm" id="start-upload-btn">开始上传</button></div>'
+                    + '</div>',
                 success: function(layero, index){
+                    var files = {};
                     upload.render({
                         elem: '#upload-area',
                         url: '/api/ssh/upload',
                         method: 'POST',
+                        multiple: true,
+                        auto: false,
+                        bindAction: '#start-upload-btn',
                         data: {
                             host: currentServer.host,
                             port: currentServer.port,
@@ -713,26 +757,117 @@
                             password: currentServer.password,
                             remotePath: currentPath
                         },
-                        before: function(obj){
+                        choose: function(obj){
+                            files = obj.pushFile();
+                            obj.preview(function(index, file){
+                                var $tbody = $('#upload-list-table tbody');
+                                var $row = $(`<tr data-index="${index}"><td>${file.name}</td><td>${formatFileSize(file.size)}</td><td class="status" style="color:#999;">待上传</td><td><button class="layui-btn layui-btn-xs layui-btn-danger remove-upload-item">移除</button></td></tr>`);
+                                $tbody.append($row);
+                                $row.find('.remove-upload-item').on('click', function(){
+                                    delete files[index];
+                                    $row.remove();
+                                });
+                            });
+                        },
+                        before: function(){
                             layer.load(1);
                         },
-                        done: function(res){
-                            layer.closeAll('loading');
+                        done: function(res, index){
                             if(res.success){
-                                layer.msg('上传成功', {icon: 1});
-                                layer.close(index);
-                                loadFileList(currentPath);
+                                $(`#upload-list-table tbody tr[data-index="${index}"] .status`).text('已完成').css('color','#5FB878');
                             } else {
-                                layer.msg('上传失败: ' + (res.message || '未知错误'), {icon: 2});
+                                $(`#upload-list-table tbody tr[data-index="${index}"] .status`).text('失败: ' + (res.message || '未知错误')).css('color','#FF5722');
                             }
                         },
-                        error: function(){
+                        allDone: function(obj){
                             layer.closeAll('loading');
-                            layer.msg('上传失败，请检查网络连接', {icon: 2});
+                            if(obj.aborted === 0 && obj.successful > 0){
+                                layer.msg('上传完成', {icon: 1});
+                                loadFileList(currentPath);
+                                layer.close(index);
+                            } else if (obj.successful === 0){
+                                layer.msg('全部上传失败', {icon: 2});
+                            } else {
+                                layer.msg('部分文件上传失败', {icon: 2});
+                            }
+                        },
+                        error: function(index){
+                            $(`#upload-list-table tbody tr[data-index="${index}"] .status`).text('网络错误').css('color','#FF5722');
                         }
                     });
                 }
             });
+        });
+
+        // 批量下载：按勾选的文件顺序排队下载
+        $('#batch-download-btn').on('click', function(){
+            if(!isConnected){
+                layer.msg('请先连接服务器', {icon: 0});
+                return;
+            }
+            const selected = [];
+            $('.file-item').each(function(){
+                const $item = $(this);
+                const type = $item.data('type');
+                const name = $item.data('name');
+                const checked = $item.find('.file-select-checkbox').prop('checked');
+                if (checked && type === 'file') {
+                    selected.push(name);
+                }
+            });
+            if (selected.length === 0) {
+                layer.msg('请先勾选要下载的文件', {icon: 0});
+                return;
+            }
+            // 构建任务队列UI
+            const listHtml = selected.map(n => `<li data-name="${n}"><span>${n}</span> <span class="status" style="color:#999;">待下载</span></li>`).join('');
+            const panelHtml = `<div style="padding:10px;"><ul id="download-task-list" style="line-height:24px;">${listHtml}</ul><div style="margin-top:10px;text-align:right;"><button class="layui-btn layui-btn-sm" id="start-batch-download">开始下载</button></div></div>`;
+            layer.open({
+                type: 1,
+                title: '批量下载',
+                area: ['520px','360px'],
+                content: panelHtml,
+                success: function(){
+                    $('#start-batch-download').on('click', function(){
+                        const $items = $('#download-task-list li');
+                        let i = 0;
+                        const next = () => {
+                            if (i >= $items.length) {
+                                layer.msg('下载完成', {icon: 1});
+                                return;
+                            }
+                            const $li = $($items[i]);
+                            const name = $li.data('name');
+                            $li.find('.status').text('下载中...').css('color','#01AAED');
+                            const url = `/api/ssh/download?host=${encodeURIComponent(currentServer.host)}&port=${encodeURIComponent(currentServer.port)}&username=${encodeURIComponent(currentServer.username)}&password=${encodeURIComponent(currentServer.password)}&path=${encodeURIComponent(currentPath + '/' + name)}`;
+                            fetch(url).then(res => {
+                                if(!res.ok){ throw new Error('HTTP ' + res.status); }
+                                return res.blob();
+                            }).then(blob => {
+                                const a = document.createElement('a');
+                                const objectUrl = URL.createObjectURL(blob);
+                                a.href = objectUrl;
+                                a.download = name;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                URL.revokeObjectURL(objectUrl);
+                                $li.find('.status').text('已完成').css('color','#5FB878');
+                                i++; next();
+                            }).catch(err => {
+                                $li.find('.status').text('失败: ' + err.message).css('color','#FF5722');
+                                i++; next();
+                            });
+                        };
+                        next();
+                    });
+                }
+            });
+        });
+
+        // 清空选择
+        $('#clear-selection-btn').on('click', function(){
+            $('.file-select-checkbox').prop('checked', false);
         });
         
         $('#mkdir-btn').on('click', function(){
@@ -1253,6 +1388,191 @@
                 error: function(xhr, status, error) {
                     layer.close(loadingIndex);
                     let errorMsg = '查看文件失败';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg += ': ' + xhr.responseJSON.message;
+                    } else if (xhr.status === 0) {
+                        errorMsg += ': 网络连接失败';
+                    } else {
+                        errorMsg += ': ' + error;
+                    }
+                    layer.msg(errorMsg, {icon: 2});
+                }
+            });
+        }
+
+        // 预览文件（文本/图片/PDF）
+        function previewFile(fileName){
+            if(!isConnected || !currentServer) {
+                layer.msg('请先连接服务器', {icon: 0});
+                return;
+            }
+            const loadingIndex = layer.load(1);
+            $.ajax({
+                url: '/api/ssh/preview',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    host: currentServer.host,
+                    port: currentServer.port,
+                    username: currentServer.username,
+                    password: currentServer.password,
+                    path: currentPath + '/' + fileName
+                }),
+                success: function(res){
+                    layer.close(loadingIndex);
+                    if(res.success){
+                        const data = res.data || {};
+                        if (data.type === 'text') {
+                            layer.open({
+                                type: 1,
+                                title: '预览(文本): ' + fileName,
+                                content: '<div style="padding: 15px;"><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">' + $('<div>').text(data.content || '').html() + '</pre></div>',
+                                area: ['80%', '70%'],
+                                maxmin: true
+                            });
+                        } else if (data.type === 'image') {
+                            layer.open({
+                                type: 1,
+                                title: '预览(图片): ' + fileName,
+                                content: '<div style="padding: 10px; text-align:center;"><img src="' + (data.content || '') + '" style="max-width: 100%; max-height: 70vh;" /></div>',
+                                area: ['80%', '80%'],
+                                maxmin: true
+                            });
+                        } else if (data.type === 'pdf') {
+                            layer.open({
+                                type: 1,
+                                title: '预览(PDF): ' + fileName,
+                                content: '<div style="height: 80vh;"><iframe src="' + (data.content || '') + '" style="width:100%; height:100%; border:none;"></iframe></div>',
+                                area: ['90%', '90%'],
+                                maxmin: true
+                            });
+                        } else {
+                            layer.msg((data.message || '不支持该文件类型预览'), {icon: 0});
+                        }
+                    } else {
+                        layer.msg('预览失败: ' + (res.message || '未知错误'), {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error){
+                    layer.close(loadingIndex);
+                    let errorMsg = '预览失败';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg += ': ' + xhr.responseJSON.message;
+                    } else if (xhr.status === 0) {
+                        errorMsg += ': 网络连接失败';
+                    } else {
+                        errorMsg += ': ' + error;
+                    }
+                    layer.msg(errorMsg, {icon: 2});
+                }
+            });
+        }
+
+        // 编辑文本文件并保存
+        function editFile(fileName){
+            if(!isConnected || !currentServer) {
+                layer.msg('请先连接服务器', {icon: 0});
+                return;
+            }
+            const ext = (fileName.split('.').pop() || '').toLowerCase();
+            const editableExts = ["txt","log","md","json","xml","html","css","js","java","py","cpp","c","h","php","sql","ssh","yml","yaml","properties","conf","cfg","ini"];
+            if (!editableExts.includes(ext)) {
+                layer.msg('该文件类型不支持在线编辑', {icon: 0});
+                return;
+            }
+
+            const loadingIndex = layer.load(1);
+            $.ajax({
+                url: '/api/ssh/view',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    host: currentServer.host,
+                    port: currentServer.port,
+                    username: currentServer.username,
+                    password: currentServer.password,
+                    path: currentPath + '/' + fileName
+                }),
+                success: function(res){
+                    layer.close(loadingIndex);
+                    if(res.success){
+                        const safeContent = res.data || '';
+                        const editorHtml = [
+                            '<div style="padding: 10px;">',
+                            '<textarea id="inline-editor-textarea" style="width:100%; height: 60vh; border:1px solid #e6e6e6; border-radius:4px; padding:10px; font-family: monospace; white-space: pre; overflow: auto;"></textarea>',
+                            '<div style="margin-top:10px; text-align:right;">',
+                            '<button id="inline-editor-save" class="layui-btn layui-btn-normal">保存</button>',
+                            '<button id="inline-editor-cancel" class="layui-btn layui-btn-primary" style="margin-left:8px;">取消</button>',
+                            '</div>',
+                            '</div>'
+                        ].join('');
+
+                        const index = layer.open({
+                            type: 1,
+                            title: '编辑: ' + fileName + '（Ctrl+S 保存）',
+                            content: editorHtml,
+                            area: ['80%', '80%'],
+                            maxmin: true,
+                            success: function(){
+                                const $ta = $('#inline-editor-textarea');
+                                $ta.val(safeContent);
+                                $ta.on('keydown', function(ev){
+                                    if (ev.ctrlKey && (ev.key === 's' || ev.keyCode === 83)) {
+                                        ev.preventDefault();
+                                        $('#inline-editor-save').click();
+                                    }
+                                });
+                                $('#inline-editor-cancel').on('click', function(){
+                                    layer.close(index);
+                                });
+                                $('#inline-editor-save').on('click', function(){
+                                    const newContent = $ta.val();
+                                    const saving = layer.load(1);
+                                    $.ajax({
+                                        url: '/api/ssh/save',
+                                        type: 'POST',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify({
+                                            host: currentServer.host,
+                                            port: currentServer.port,
+                                            username: currentServer.username,
+                                            password: currentServer.password,
+                                            filePath: currentPath + '/' + fileName,
+                                            content: newContent
+                                        }),
+                                        success: function(resp){
+                                            layer.close(saving);
+                                            if (resp && resp.success) {
+                                                layer.msg('保存成功', {icon: 1});
+                                                layer.close(index);
+                                                loadFileList(currentPath);
+                                            } else {
+                                                layer.msg('保存失败: ' + (resp && resp.message ? resp.message : '未知错误'), {icon: 2});
+                                            }
+                                        },
+                                        error: function(xhr, status, error){
+                                            layer.close(saving);
+                                            let msg = '保存失败';
+                                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                                msg += ': ' + xhr.responseJSON.message;
+                                            } else if (xhr.status === 0) {
+                                                msg += ': 网络连接失败';
+                                            } else {
+                                                msg += ': ' + error;
+                                            }
+                                            layer.msg(msg, {icon: 2});
+                                        }
+                                    });
+                                });
+                            }
+                        });
+                    } else {
+                        layer.msg('加载文件内容失败: ' + (res.message || '未知错误'), {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error){
+                    layer.close(loadingIndex);
+                    let errorMsg = '加载文件内容失败';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         errorMsg += ': ' + xhr.responseJSON.message;
                     } else if (xhr.status === 0) {

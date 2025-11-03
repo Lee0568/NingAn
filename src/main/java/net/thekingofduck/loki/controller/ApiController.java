@@ -79,8 +79,9 @@ public class ApiController {
                              HttpServletRequest request) {
         if (new AuthService().check(request)) {
             String[] idss = ids.split(",");
-            for (String id : idss) {
-                httpLogMapper.deleteHttpLogById(Integer.parseInt(id));
+
+            for (String id:idss) {
+                httpLogMapper.safeDeleteHttpLog(Integer.parseInt(id));
             }
             return ResultViewModelUtil.success("success", "删除完成");
         } else {

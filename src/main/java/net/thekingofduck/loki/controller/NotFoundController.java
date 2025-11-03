@@ -5,6 +5,8 @@ import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import net.thekingofduck.loki.common.Utils;
 import net.thekingofduck.loki.entity.TemplateEntity;
+import net.thekingofduck.loki.entity.HoneypotService;
+import net.thekingofduck.loki.service.HoneypotServiceRegistry;
 import net.thekingofduck.loki.mapper.HttpLogMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.error.ErrorController;
@@ -40,24 +42,46 @@ public class NotFoundController implements ErrorController {
     @Autowired
     HttpLogMapper httpLogMapper;
 
+    @Autowired
+    private HoneypotServiceRegistry registry;
+
 
     @RequestMapping(value = {"/error"})
     public Object error(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // 优先根据注册表中端口解析模板，若未匹配则回退到模板配置
+        String currentTemplateName = null;
+        try {
+            for (HoneypotService svc : registry.list()) {
+                if (svc.getPort() != null && svc.getPort() == request.getServerPort()) {
+                    currentTemplateName = svc.getTemplate();
+                    // 若对应服务已被停止，返回停用页面
+                    if (!"running".equalsIgnoreCase(svc.getStatus())) {
+                        response.setStatus(503);
+                        response.addHeader("X-Honeypot-Status", "stopped");
+                        return "offline/index";
+                    }
+                    break;
+                }
+            }
+        } catch (Exception ignored) { }
 
-        //获取当前模板名称
-        String[] templateNames = templates.getList().keySet().toArray(new String[0]);
-        String currentTemplateName = "default";
-        for (String templateName:templateNames) {
-
-            Map template = (Map) templates.getList().get(templateName).get(0).get("maps");
-            int templatePort = Integer.parseInt((String) template.get("port"));
-
-            if (templatePort == request.getServerPort()){
-                currentTemplateName = templateName;
+        // 回退：从模板配置中按端口查找模板名
+        if (currentTemplateName == null) {
+            String[] templateNames = templates.getList().keySet().toArray(new String[0]);
+            for (String templateName:templateNames) {
+                Map template = (Map) templates.getList().get(templateName).get(0).get("maps");
+                int templatePort = Integer.parseInt((String) template.get("port"));
+                if (templatePort == request.getServerPort()){
+                    currentTemplateName = templateName;
+                    break;
+                }
             }
         }
 
+        if (currentTemplateName == null) currentTemplateName = "default";
         log.info(currentTemplateName);
+
+        // 状态 gating 已在上面按注册表判断；若未命中注册表则不拦截
 
         //获取当前模板路径
         Map template = (Map) templates.getList().get(currentTemplateName).get(0).get("maps");

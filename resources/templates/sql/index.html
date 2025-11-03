@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>SQL Honeypot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background:#0f172a; color:#e5e7eb; font-family: Consolas, monospace; margin:0; }
+    .wrap { max-width: 900px; margin: 40px auto; padding: 20px; }
+    .banner { color:#22d3ee; margin-bottom: 12px; }
+    .panel { background:#111827; border:1px solid #374151; padding:16px; border-radius:6px; }
+    textarea { width:100%; height:160px; background:#0b1220; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:10px; }
+    button { background:#2563eb; border:none; color:#fff; padding:8px 14px; border-radius:4px; cursor:pointer; }
+    button:hover { background:#1d4ed8; }
+    .result { margin-top:10px; white-space:pre; background:#0b1220; padding:10px; border-radius:6px; border:1px solid #374151; }
+    .hint { color:#94a3b8; font-size:12px; margin-top:8px; }
+  </style>
+  <script>
+    function runQuery(){
+      var sql = document.getElementById('sql').value.trim();
+      var out = document.getElementById('out');
+      if (!sql) { out.textContent = '请输入 SQL 语句'; return; }
+      // 简单模拟几条查询
+      if (/select\s+version\(\)/i.test(sql)) {
+        out.textContent = '+-------------------------+\n| version()              |\n+-------------------------+\n| 8.0.36-0ubuntu0.22.04  |\n+-------------------------+';
+      } else if (/select\s+user\(\)/i.test(sql)) {
+        out.textContent = '+----------------+\n| user()         |\n+----------------+\n| root@localhost |\n+----------------+';
+      } else if (/show\s+databases/i.test(sql)) {
+        out.textContent = '+--------------------+\n| Database           |\n+--------------------+\n| information_schema |\n| mysql              |\n| performance_schema |\n| sys                |\n| appdb              |\n+--------------------+';
+      } else if (/select/i.test(sql)) {
+        out.textContent = '(1 row in set)';
+      } else {
+        out.textContent = 'Query OK, 0 rows affected';
+      }
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      document.getElementById('run').addEventListener('click', runQuery);
+      document.getElementById('sql').addEventListener('keydown', function(e){
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runQuery();
+      });
+    });
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <h2 class="banner">SQL 模拟控制台</h2>
+    <div class="panel">
+      <textarea id="sql" placeholder="示例：SELECT version();"></textarea>
+      <div style="margin-top:8px">
+        <button id="run">运行 (Ctrl+Enter)</button>
+      </div>
+      <div id="out" class="result">等待执行...</div>
+      <div class="hint">本页面为 Web 蜜罐的 SQL 控制台模拟，用于诱捕与记录交互。</div>
+    </div>
+  </div>
+</body>
+</html>

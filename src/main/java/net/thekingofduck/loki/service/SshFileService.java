@@ -528,6 +528,52 @@ public class SshFileService {
             releaseConnection(connection);
         }
     }
+
+    /**
+     * 保存文本文件内容
+     */
+    public boolean saveFileContent(String host, int port, String username, String password, String filePath, String content) throws Exception {
+        validatePath(filePath);
+
+        if (content == null) {
+            content = "";
+        }
+
+        // 仅允许文本类型文件被编辑
+        String extension = getFileExtension(filePath).toLowerCase();
+        String[] textExtensions = {"txt", "log", "md", "json", "xml", "html", "css", "js", "java", "py", "cpp", "c", "h", "php", "sql", "ssh", "yml", "yaml", "properties", "conf", "cfg", "ini"};
+        boolean isTextFile = false;
+        for (String textExt : textExtensions) {
+            if (extension.equals(textExt)) {
+                isTextFile = true;
+                break;
+            }
+        }
+        if (!isTextFile) {
+            throw new Exception("不支持编辑此类型的文件: " + extension);
+        }
+
+        byte[] data = content.getBytes("UTF-8");
+        if (data.length > 1024 * 1024) { // 限制保存大小为1MB，避免异常大文本导致性能问题
+            throw new Exception("文件内容过大，最大允许保存: 1MB");
+        }
+
+        SshConnectionManager.SshConnectionInfo connection = getConnection(host, port, username, password);
+        try (java.io.InputStream inputStream = new java.io.ByteArrayInputStream(data)) {
+            ChannelSftp sftpChannel = connection.getSftpChannel();
+            sftpChannel.put(inputStream, filePath);
+
+            // 清理相关缓存
+            cacheService.clearFileContentCache(host, port, username, filePath);
+            String parentPath = filePath.contains("/") ? filePath.substring(0, filePath.lastIndexOf('/')) : "/";
+            cacheService.clearFileListCache(host, port, username, parentPath);
+            return true;
+        } catch (SftpException e) {
+            throw new Exception("保存文件失败: " + e.getMessage());
+        } finally {
+            releaseConnection(connection);
+        }
+    }
     
     /**
      * 下载文件到输出流（用于批量下载）

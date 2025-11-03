@@ -52,7 +52,18 @@ public interface HttpLogMapper {
      * @return
      */
     @Delete("DELETE FROM `main`.`httplog` WHERE rowid = #{id}")
-    Integer deleteHttpLogById(int id);
+    Integer deleteHttpLog(Integer id);
+    
+    /**
+     * 安全删除 httplog 记录（先删除关联的 canvas 记录）
+     * @param id httplog 记录的 ID
+     * @return 删除的记录数
+     */
+    @Delete({
+        "DELETE FROM `main`.`canvas` WHERE canvasId IN (SELECT canvasId FROM `main`.`httplog` WHERE rowid = #{id});",
+        "DELETE FROM `main`.`httplog` WHERE rowid = #{id}"
+    })
+    Integer safeDeleteHttpLog(Integer id);
 
     /**
      * 根据分页参数获取用户信息列表

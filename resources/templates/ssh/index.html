@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>SSH Honeypot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background:#0b132b; color:#e0e0e0; font-family: Consolas, monospace; margin:0; }
+    .wrap { max-width: 900px; margin: 40px auto; padding: 20px; }
+    .banner { color:#7bd389; margin-bottom: 12px; }
+    .terminal { background:#1c2541; border:1px solid #3a506b; padding:16px; border-radius:6px; min-height:300px; }
+    .prompt { color:#5bc0be; }
+    input { width:100%; background:#0b132b; color:#e0e0e0; border:1px solid #3a506b; padding:8px; border-radius:4px; }
+    .hint { color:#8d99ae; font-size:12px; margin-top:8px; }
+  </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      var term = document.getElementById('term');
+      var input = document.getElementById('cmd');
+      var history = [];
+      var prompt = '[admin@server ~]$';
+
+      function log(line){
+        var div = document.createElement('div');
+        div.textContent = line;
+        term.appendChild(div);
+        term.scrollTop = term.scrollHeight;
+      }
+
+      log('OpenSSH_8.4p1, OpenSSL 1.1.1 (Debian)');
+      log('Type "help" to list commands. This is a simulated environment.');
+      log(prompt + ' ');
+
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') {
+          var cmd = input.value.trim();
+          input.value = '';
+          history.push(cmd);
+          log(prompt + ' ' + cmd);
+          // 简单模拟输出
+          switch(cmd){
+            case 'help':
+              log('Available commands: whoami, uname -a, ls, cat /etc/issue');
+              break;
+            case 'whoami':
+              log('root');
+              break;
+            case 'uname -a':
+              log('Linux honeypot 5.10.0-12-amd64 #1 SMP Debian x86_64 GNU/Linux');
+              break;
+            case 'ls':
+              log('bin  boot  dev  etc  home  lib  opt  root  sbin  usr  var');
+              break;
+            case 'cat /etc/issue':
+              log('Debian GNU/Linux 11 \n \l');
+              break;
+            default:
+              log('bash: ' + cmd + ': command not found');
+          }
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <h2 class="banner">SSH 模拟终端</h2>
+    <div id="term" class="terminal"></div>
+    <div class="prompt">输入命令并回车：</div>
+    <input id="cmd" type="text" placeholder="eg: whoami">
+    <div class="hint">本页面为 Web 蜜罐的 SSH 终端模拟，用于诱捕与记录交互。</div>
+  </div>
+</body>
+</html>

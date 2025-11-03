@@ -224,3 +224,37 @@ templates:
 #  username: "qdgqidgqd"
 #  password: "123456asd*X"
 #  signature: "【柠安安全蜜罐】您的网站在过去{num}分钟内检测到{count}次攻击，已超过{threshold}次的阈值。请立即检查系统安全！"
+    ssh:
+      - maps: {
+        port: '8022',
+        path: 'ssh/index.html',
+        code: '200',
+        header: {
+          Server: "OpenSSH",
+          X-SSH-Server: "OpenSSH_8.4"
+        },
+        respbody: 'error',
+      }
+    sql:
+      - maps: {
+        port: '8081',
+        path: 'sql/index.html',
+        code: '200',
+        header: {
+          Server: "Apache",
+          X-DB-Server: "MySQL/8.0"
+        },
+        respbody: 'error',
+      }
+    custom:
+      - maps: {
+        port: '8088',
+        path: 'custom/index.html',
+        code: '200',
+        header: {
+          Set-Cookie: "session=custom",
+          Server: "nginx",
+          X-Powered-By: "PHP/5.6"
+        },
+        respbody: 'error',
+      }

@@ -152,6 +152,11 @@
 </div>
 
 <script>
+    console.log('欢迎来到员工后台！');
+    /**
+     * 生成 Canvas 浏览器指纹哈希值
+     * @returns {Promise<string>} 返回一个 Promise，成功时解析为指纹哈希值（SHA-256）
+     */
     async function getCanvasFingerprint() {
         return new Promise((resolve) => {
             const canvas = document.createElement('canvas');
