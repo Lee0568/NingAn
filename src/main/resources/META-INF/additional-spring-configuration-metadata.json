@@ -7,34 +7,34 @@
       "defaultValue": "80,8000-9000"
     },
     {
-      "name": "loki.adminPath",
+      "name": "ningan.adminPath",
       "type": "java.lang.String",
       "description": "后台路径配置."
     },
     {
-      "name": "loki.adminPort",
+      "name": "ningan.adminPort",
       "type": "java.lang.String",
       "description": "后台端口配置，该端口必须存在于多端口配置中，否则后台无法访问."
     },
     {
-      "name": "loki.username",
+      "name": "ningan.username",
       "type": "java.lang.String",
       "description": "后台账号."
     },
     {
-      "name": "loki.password",
+      "name": "ningan.password",
       "type": "java.lang.String",
       "description": "后台密码."
     },
     {
-      "name": "loki.templates",
+      "name": "ningan.templates",
       "type": "java.lang.String",
-      "description": "Loki模板路径."
+      "description": "ningan模板路径."
     },
     {
-      "name": "loki.statics",
+      "name": "ningan.statics",
       "type": "java.lang.String",
-      "description": "Loki模板静态资源(images,js,css)的路径."
+      "description": "ningan模板静态资源(images,js,css)的路径."
     }
   ]
 }

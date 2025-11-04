@@ -623,7 +623,7 @@
         } catch (error) {
             // 错误已经在 sendToBackend 中打印，这里只显示用户友好的提示
             toggleLoading(false); // 隐藏加载动画
-            addMessage('ai', `抱歉，Loki AI 助手暂时无法回复您的问题。错误：${error.message || '未知错误'}`);
+            addMessage('ai', `抱歉，ningan AI 助手暂时无法回复您的问题。错误：${error.message || '未知错误'}`);
         } finally {
             isSending = false;
             sendButton.disabled = false;

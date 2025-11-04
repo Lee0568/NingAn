@@ -71,13 +71,13 @@
 
 <div id="output">
         <pre>
-Loki Honeypot v1.0
+ningan Honeypot v1.0
 Type 'help' for available commands.
         </pre>
 </div>
 
 <div id="input-container">
-    <span id="prompt">lokiuser@honeypot:~$&nbsp;</span>
+    <span id="prompt">ninganuser@honeypot:~$&nbsp;</span>
     <input type="text" id="command-input" autofocus>
     <span id="cursor"></span> </div>
 
@@ -147,13 +147,13 @@ Type 'help' for available commands.
             commandInput.value = ''; // 清空输入框
 
             // 将用户输入的命令添加到输出区域
-            outputDiv.innerHTML += `<pre><span id="prompt">lokiuser@honeypot:~$</span> ${command}</pre>`;
+            outputDiv.innerHTML += `<pre><span id="prompt">ninganuser@honeypot:~$</span> ${command}</pre>`;
             scrollToBottom();
             updateCursorPosition(); // 清空后重新调整光标位置
 
             if (command === 'clear') { // 特殊处理 'clear' 命令
                 outputDiv.innerHTML = `<pre>
-Loki Honeypot v1.0
+ningan Honeypot v1.0
 Type 'help' for available commands.
 </pre>`;
                 scrollToBottom();

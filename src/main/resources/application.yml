@@ -6,11 +6,11 @@ server:
     enabled:
       false                             #SSL协议配置开开关
     key-store:
-      loki.keystore
+      ningan.keystore
     key-alias:
-      loki
+      ningan
     key-store-password:
-      loki@2333
+      ningan@2333
     key-store-type:
       JKS
 
@@ -27,7 +27,7 @@ spring:
 
   # ============================ 数据库配置 ============================
   datasource:
-    url: jdbc:sqlite:data/loki.db # 创建的sqlite数据库所在路径
+    url: jdbc:sqlite:data/ningan.db # 创建的sqlite数据库所在路径
     username: # 因为没有用户名和密码，所以这两个参数就没有值
     password:
     driver-class-name: org.sqlite.JDBC # sqlite驱动
@@ -49,16 +49,16 @@ spring:
 # mybatis配置
 mybatis:
   mapper-locations: classpath:mybatis/mapper/*Mapper.xml # 配置mapper.xml文件路径
-  type-aliases-package: net.thekingofduck.loki.entity # 实体类包名
+  type-aliases-package: net.thekingofduck.ningan.entity # 实体类包名
 
-loki:
-  adminPath: lokiadmin                  #后台路径 http://HOST:ADMINPORT/ADMINPPATH
+ningan:
+  adminPath: ninganadmin                  #后台路径 http://HOST:ADMINPORT/ADMINPPATH
   adminPort: 65535                      #后台端口 这个端口如果不在上面的端口列表里则后台无法访问
   templates: /resources/templates/      #模板渲染的路径 在jar包同级目录
   statics: /resources/statics/          #模板静态资源(images,js,css)的路径 在jar包同级目录
   # ========== 之前需要添加的两行 (已存在) ==========
-  username: loki                        # Loki管理员的用户名
-  password: loki@2333                   # Loki管理员的密码 (与你日志中的登录尝试一致)
+  username: loki                        # 管理员的用户名
+  password: loki@2333                   # 管理员的密码 (与你日志中的登录尝试一致)
   # ==================================
 
 # --- DeepSeek API 配置 ---
@@ -145,7 +145,7 @@ ssh:
 logging:
   level:
     root: INFO
-    net.thekingofduck.loki: DEBUG
+    net.thekingofduck.ningan: DEBUG
     org.springframework.web: INFO
     org.springframework.security: WARN
     com.jcraft.jsch: WARN
@@ -153,7 +153,7 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: logs/loki.log
+    name: logs/ningan.log
     max-size: 10MB
     max-history: 30
     total-size-cap: 1GB

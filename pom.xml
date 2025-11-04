@@ -9,7 +9,7 @@
     <groupId>net.thekingofduck</groupId>
     <artifactId>NingAn</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>loki</name>
+    <name>ningan</name>
     <description>Honeypot project for Spring Boot</description>
 
     <properties>
