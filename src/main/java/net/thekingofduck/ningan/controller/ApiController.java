@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.thekingofduck.ningan.entity.CanvasEnity;
 import net.thekingofduck.ningan.entity.CommandEnity;
 import net.thekingofduck.ningan.entity.HttpLogEntity;
+import net.thekingofduck.ningan.entity.LogEvent;
 import net.thekingofduck.ningan.entity.UserInfoEnity;
 import net.thekingofduck.ningan.mapper.HttpLogMapper;
 import net.thekingofduck.ningan.mapper.UserInfoMapper;
@@ -15,6 +16,7 @@ import net.thekingofduck.ningan.service.AuthService;
 import net.thekingofduck.ningan.service.DeepSeekService;
 import net.thekingofduck.ningan.service.HttpLogService; // 确保导入 HttpLogService
 import net.thekingofduck.ningan.service.UserService;
+import net.thekingofduck.ningan.service.LogEventService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -396,5 +398,34 @@ public class ApiController {
         );
         MenuInfo menuInfo = new MenuInfo("常规管理", "fa fa-address-book", "", "_self", childList);
         return new InitConfig(homeInfo, logoInfo, List.of(menuInfo));
+    }
+
+    // 在现有@Autowired下面添加
+    @Autowired
+    private LogEventService logEventService;
+
+    // 添加新方法，放在合适位置，例如在文件末尾或相关方法后
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @PostMapping("/log")
+    public ResponseEntity<String> saveLog(@RequestBody LogEvent logEvent, HttpServletRequest request) {
+        String clientIp = getClientIp(request);
+        logEvent.setIp(clientIp);
+        if (logEvent.getTimestamp() == null) {
+            ZonedDateTime nowInShanghai = ZonedDateTime.now(ZoneId.of("Asia/Shanghai"));
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            logEvent.setTimestamp(nowInShanghai.format(formatter));
+        }
+        // Ensure type, userAgent, and referrer are handled properly
+        if (logEvent.getType() == null || logEvent.getType().isEmpty()) {
+            logEvent.setType("unknown");
+        }
+        if (logEvent.getUserAgent() == null) {
+            logEvent.setUserAgent("");
+        }
+        if (logEvent.getReferrer() == null) {
+            logEvent.setReferrer("");
+        }
+        logEventService.saveLogEvent(logEvent);
+        return ResponseEntity.ok("Log saved successfully");
     }
 }
