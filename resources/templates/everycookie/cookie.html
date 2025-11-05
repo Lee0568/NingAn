@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evercookie 完整示例</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .container { background: #f5f5f5; padding: 20px; border-radius: 8px; }
+    .input-group { margin: 10px 0; }
+    input, button { padding: 8px 12px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+    button { background: #007bff; color: white; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .result { background: white; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    .storage-status { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+    .storage-item { background: white; padding: 10px; border-radius: 4px; }
+    .success { color: green; }
+    .error { color: red; }
+    .warning { color: orange; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Evercookie 完整示例</h1>
+
+  <div class="input-group">
+    <input type="text" id="keyInput" placeholder="输入键名" value="user_preferences">
+    <input type="text" id="valueInput" placeholder="输入值" value='{"theme":"dark","language":"zh-CN"}'>
+    <button onclick="setValue()">存储数据</button>
+    <button onclick="getValue()">读取数据</button>
+    <button onclick="clearValue()">清除数据</button>
+  </div>
+
+  <div id="result" class="result">结果将显示在这里...</div>
+
+  <div class="storage-status" id="storageStatus">
+    <!-- 存储状态将动态显示在这里 -->
+  </div>
+
+  <h3>测试场景</h3>
+  <button onclick="testPersistence()">测试数据持久性</button>
+  <button onclick="simulateClearStorage()">模拟清除部分存储</button>
+  <button onclick="checkAllStorage()">检查所有存储状态</button>
+</div>
+
+<script>
+  // 在这里直接定义 Evercookie 类
+  class Evercookie {
+      constructor() {
+          this.dbName = 'evercookie_db';
+          this.storeName = 'evercookie_store';
+          this.idbSupported = 'indexedDB' in window;
+      }
+
+      // Set value in all available storage mechanisms
+      async set(key, value) {
+          this.setCookie(key, value);
+          this.setLocalStorage(key, value);
+          this.setSessionStorage(key, value);
+          this.setWindowName(key, value);
+          if (this.idbSupported) {
+              await this.setIndexedDB(key, value);
+          }
+      }
+
+      // Retrieve value from available storage mechanisms
+      async get(key) {
+          const values = [];
+
+          const cookieVal = this.getCookie(key);
+          if (cookieVal) values.push(cookieVal);
+
+          const localVal = this.getLocalStorage(key);
+          if (localVal) values.push(localVal);
+
+          const sessionVal = this.getSessionStorage(key);
+          if (sessionVal) values.push(sessionVal);
+
+          const windowVal = this.getWindowName(key);
+          if (windowVal) values.push(windowVal);
+
+          if (this.idbSupported) {
+              const idbVal = await this.getIndexedDB(key);
+              if (idbVal) values.push(idbVal);
+          }
+
+          // Return the most frequent value
+          return this.getMostFrequentValue(values);
+      }
+
+      // Helper to determine the most frequent value
+      getMostFrequentValue(arr) {
+          const freqMap = {};
+          let maxFreq = 0;
+          let mostFreqVal = null;
+
+          for (const val of arr) {
+              freqMap[val] = (freqMap[val] || 0) + 1;
+              if (freqMap[val] > maxFreq) {
+                  maxFreq = freqMap[val];
+                  mostFreqVal = val;
+              }
+          }
+
+          return mostFreqVal;
+      }
+
+      // Cookie methods
+      setCookie(key, value) {
+          document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+
+      getCookie(key) {
+          const cookies = document.cookie.split('; ');
+          for (const cookie of cookies) {
+              const [k, v] = cookie.split('=');
+              if (decodeURIComponent(k) === key) {
+                  return decodeURIComponent(v);
+              }
+          }
+          return null;
+      }
+
+      // localStorage methods
+      setLocalStorage(key, value) {
+          try {
+              localStorage.setItem(key, value);
+          } catch (e) {
+              console.warn('localStorage 设置失败:', e);
+          }
+      }
+
+      getLocalStorage(key) {
+          try {
+              return localStorage.getItem(key);
+          } catch (e) {
+              return null;
+          }
+      }
+
+      // sessionStorage methods
+      setSessionStorage(key, value) {
+          try {
+              sessionStorage.setItem(key, value);
+          } catch (e) {
+              console.warn('sessionStorage 设置失败:', e);
+          }
+      }
+
+      getSessionStorage(key) {
+          try {
+              return sessionStorage.getItem(key);
+          } catch (e) {
+              return null;
+          }
+      }
+
+      // window.name methods
+      setWindowName(key, value) {
+          try {
+              const data = JSON.parse(window.name || '{}');
+              data[key] = value;
+              window.name = JSON.stringify(data);
+          } catch (e) {
+              console.warn('window.name 设置失败:', e);
+          }
+      }
+
+      getWindowName(key) {
+          try {
+              const data = JSON.parse(window.name || '{}');
+              return data[key] || null;
+          } catch (e) {
+              return null;
+          }
+      }
+
+      // IndexedDB methods
+      async setIndexedDB(key, value) {
+          if (!this.idbSupported) return;
+
+          try {
+              const db = await this.openIndexedDB();
+              const tx = db.transaction(this.storeName, 'readwrite');
+              const store = tx.objectStore(this.storeName);
+              store.put(value, key);
+              await new Promise((resolve, reject) => {
+                  tx.oncomplete = resolve;
+                  tx.onerror = reject;
+              });
+              db.close();
+          } catch (e) {
+              console.warn('IndexedDB 设置失败:', e);
+          }
+      }
+
+      async getIndexedDB(key) {
+          if (!this.idbSupported) return null;
+
+          try {
+              const db = await this.openIndexedDB();
+              return new Promise((resolve) => {
+                  const tx = db.transaction(this.storeName, 'readonly');
+                  const store = tx.objectStore(this.storeName);
+                  const request = store.get(key);
+                  request.onsuccess = () => {
+                      resolve(request.result || null);
+                      db.close();
+                  };
+                  request.onerror = () => {
+                      resolve(null);
+                      db.close();
+                  };
+              });
+          } catch (e) {
+              console.warn('IndexedDB 读取失败:', e);
+              return null;
+          }
+      }
+
+      openIndexedDB() {
+          return new Promise((resolve, reject) => {
+              const request = indexedDB.open(this.dbName, 1);
+              request.onupgradeneeded = () => {
+                  const db = request.result;
+                  if (!db.objectStoreNames.contains(this.storeName)) {
+                      db.createObjectStore(this.storeName);
+                  }
+              };
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+          });
+      }
+  }
+
+  // 初始化 Evercookie 实例
+  let ec;
+
+  // 页面加载完成后初始化
+  document.addEventListener('DOMContentLoaded', function() {
+      ec = new Evercookie();
+      document.getElementById('result').innerHTML = `
+          <strong>✅ Evercookie 已初始化</strong><br>
+          支持 IndexedDB: ${ec.idbSupported ? '✅' : '❌'}<br>
+          当前时间: ${new Date().toLocaleString()}<br>
+          <small>可以开始使用存储和读取功能</small>
+      `;
+  });
+
+  // 设置值
+  async function setValue() {
+      if (!ec) {
+          showError('Evercookie 未初始化，请刷新页面');
+          return;
+      }
+
+      const key = document.getElementById('keyInput').value;
+      const value = document.getElementById('valueInput').value;
+
+      if (!key || !value) {
+          showError('请输入键名和值');
+          return;
+      }
+
+      try {
+          await ec.set(key, value);
+          showSuccess(`
+              <strong>✅ 数据存储成功</strong><br>
+              Key: ${key}<br>
+              Value: ${value}<br>
+              时间: ${new Date().toLocaleString()}
+          `);
+          updateStorageStatus();
+      } catch (error) {
+          showError(`存储失败: ${error.message}`);
+      }
+  }
+
+  // 读取值
+  async function getValue() {
+      if (!ec) {
+          showError('Evercookie 未初始化，请刷新页面');
+          return;
+      }
+
+      const key = document.getElementById('keyInput').value;
+
+      if (!key) {
+          showError('请输入键名');
+          return;
+      }
+
+      try {
+          const value = await ec.get(key);
+          if (value) {
+              showSuccess(`
+                  <strong>✅ 数据读取成功</strong><br>
+                  Key: ${key}<br>
+                  Value: ${value}<br>
+                  时间: ${new Date().toLocaleString()}
+              `);
+          } else {
+              showWarning(`
+                  <strong>⚠️ 未找到数据</strong><br>
+                  Key: ${key} 不存在于任何存储中
+              `);
+          }
+          updateStorageStatus();
+      } catch (error) {
+          showError(`读取失败: ${error.message}`);
+      }
+  }
+
+  // 清除值
+  async function clearValue() {
+      if (!ec) {
+          showError('Evercookie 未初始化，请刷新页面');
+          return;
+      }
+
+      const key = document.getElementById('keyInput').value;
+
+      if (!key) {
+          showError('请输入要清除的键名');
+          return;
+      }
+
+      try {
+          // 从各个存储中分别清除
+          ec.setCookie(key, '');
+          ec.setLocalStorage(key, '');
+          ec.setSessionStorage(key, '');
+          ec.setWindowName(key, '');
+          if (ec.idbSupported) {
+              await ec.setIndexedDB(key, '');
+          }
+
+          showSuccess(`
+              <strong>✅ 数据清除成功</strong><br>
+              Key: ${key} 已从所有存储中清除<br>
+              时间: ${new Date().toLocaleString()}
+          `);
+          updateStorageStatus();
+      } catch (error) {
+          showError(`清除失败: ${error.message}`);
+      }
+  }
+
+  // 测试数据持久性
+  async function testPersistence() {
+      if (!ec) {
+          showError('Evercookie 未初始化，请刷新页面');
+          return;
+      }
+
+      const testKey = 'persistence_test';
+      const testValue = `测试数据-${Date.now()}`;
+
+      // 存储测试数据
+      await ec.set(testKey, testValue);
+
+      // 从各个存储单独读取
+      let resultHTML = `<strong>🔍 持久性测试结果</strong><br>`;
+      resultHTML += `存储的测试值: <code>${testValue}</code><br><br>`;
+
+      const cookieVal = ec.getCookie(testKey);
+      const localVal = ec.getLocalStorage(testKey);
+      const sessionVal = ec.getSessionStorage(testKey);
+      const windowVal = ec.getWindowName(testKey);
+      let idbVal = '不支持';
+      if (ec.idbSupported) {
+          idbVal = await ec.getIndexedDB(testKey);
+      }
+
+      // 显示各个存储的状态
+      const sources = [
+          { name: 'Cookie', value: cookieVal },
+          { name: 'localStorage', value: localVal },
+          { name: 'sessionStorage', value: sessionVal },
+          { name: 'window.name', value: windowVal },
+          { name: 'IndexedDB', value: idbVal }
+      ];
+
+      for (const source of sources) {
+          const status = source.value === testValue ? '✅' : '❌';
+          resultHTML += `${status} ${source.name}: ${source.value || '<em>空</em>'}<br>`;
+      }
+
+      // 测试综合读取
+      const combinedValue = await ec.get(testKey);
+      resultHTML += `<br>🎯 <strong>综合读取结果</strong>: ${combinedValue}`;
+      resultHTML += `<br>${combinedValue === testValue ? '✅ 数据恢复成功' : '❌ 数据恢复失败'}`;
+
+      document.getElementById('result').innerHTML = resultHTML;
+  }
+
+  // 模拟清除部分存储
+  async function simulateClearStorage() {
+      if (!ec) {
+          showError('Evercookie 未初始化，请刷新页面');
+          return;
+      }
+
+      const testKey = 'persistence_test';
+      const currentValue = ec.getLocalStorage(testKey);
+
+      if (!currentValue) {
+          showWarning('请先运行"测试数据持久性"来创建测试数据');
+          return;
+      }
+
+      // 清除部分存储
+      localStorage.removeItem(testKey);
+      sessionStorage.removeItem(testKey);
+
+      showWarning(`
+          <strong>🧪 模拟存储清除</strong><br>
+          已清除 localStorage 和 sessionStorage<br>
+          原始值: ${currentValue}<br>
+          请点击"读取数据"测试从其他存储恢复数据
+      `);
+  }
+
+  // 检查所有存储状态
+  async function checkAllStorage() {
+      if (!ec) {
+          showError('Evercookie 未初始化，请刷新页面');
+          return;
+      }
+
+      const key = document.getElementById('keyInput').value;
+      let resultHTML = `<strong>📊 存储状态检查</strong><br>`;
+
+      if (key) {
+          resultHTML += `检查键: <code>${key}</code><br><br>`;
+
+          const cookieVal = ec.getCookie(key);
+          const localVal = ec.getLocalStorage(key);
+          const sessionVal = ec.getSessionStorage(key);
+          const windowVal = ec.getWindowName(key);
+          let idbVal = '不支持';
+          if (ec.idbSupported) {
+              idbVal = await ec.getIndexedDB(key) || '空';
+          }
+
+          const sources = [
+              { name: 'Cookie', value: cookieVal },
+              { name: 'localStorage', value: localVal },
+              { name: 'sessionStorage', value: sessionVal },
+              { name: 'window.name', value: windowVal },
+              { name: 'IndexedDB', value: idbVal }
+          ];
+
+          for (const source of sources) {
+              const hasData = source.value && source.value !== '不支持';
+              resultHTML += `${hasData ? '✅' : '❌'} ${source.name}: ${hasData ? `<code>${source.value}</code>` : '<em>无数据</em>'}<br>`;
+          }
+      } else {
+          resultHTML += '请输入要检查的键名';
+      }
+
+      document.getElementById('result').innerHTML = resultHTML;
+  }
+
+  // 更新存储状态显示
+  function updateStorageStatus() {
+      if (!ec) return;
+
+      const key = document.getElementById('keyInput').value;
+      if (!key) return;
+
+      const status = {
+          'Cookie': ec.getCookie(key),
+          'localStorage': ec.getLocalStorage(key),
+          'sessionStorage': ec.getSessionStorage(key),
+          'window.name': ec.getWindowName(key)
+      };
+
+      let statusHTML = '';
+      for (const [source, value] of Object.entries(status)) {
+          statusHTML += `
+              <div class="storage-item">
+                  <strong>${source}:</strong> ${value ? '<span class="success">✅ 有数据</span>' : '<span class="error">❌ 无数据</span>'}<br>
+                  <small>${value ? value.substring(0, 50) + (value.length > 50 ? '...' : '') : ''}</small>
+              </div>
+          `;
+      }
+
+      document.getElementById('storageStatus').innerHTML = statusHTML;
+  }
+
+  // 显示消息的辅助函数
+  function showSuccess(message) {
+      document.getElementById('result').innerHTML = `<div class="success">${message}</div>`;
+  }
+
+  function showError(message) {
+      document.getElementById('result').innerHTML = `<div class="error">${message}</div>`;
+  }
+
+  function showWarning(message) {
+      document.getElementById('result').innerHTML = `<div class="warning">${message}</div>`;
+  }
+</script>
+</body>
+</html>

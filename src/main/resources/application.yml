@@ -219,6 +219,39 @@ templates:
         },
         respbody: 'error',
       }
+    webrtc:
+      - maps: {
+        port: '8091',
+        path: 'webrtc/webrtc_login.html',
+        code: '200',
+        header: {
+          Set-Cookie: "jsessionid=webrtc",
+          Server: "nginx"
+        },
+        respbody: 'error',
+      }
+    fingerprint:
+      - maps: {
+        port: '8092',
+        path: 'fingerprint/fp_login.html',
+        code: '200',
+        header: {
+          Set-Cookie: "jsessionid=fingerprint",
+          Server: "nginx"
+        },
+        respbody: 'error',
+      }
+    everycookie:
+      - maps: {
+        port: '8093',
+        path: 'everycookie/cookie.html',
+        code: '200',
+        header: {
+          Set-Cookie: "jsessionid=everycookie",
+          Server: "nginx"
+        },
+        respbody: 'error',
+      }
 
 #smsbao:
 #  username: "qdgqidgqd"

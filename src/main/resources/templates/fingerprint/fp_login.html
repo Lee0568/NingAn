@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loki 指纹蜜罐登录</title>
+  <style>
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#0f172a; color:#e5e7eb; }
+    .brand { background:#111827; border-bottom:1px solid #1f2937; padding:12px 16px; display:flex; align-items:center; gap:12px; }
+    .brand .logo { width:28px; height:28px; border-radius:6px; background:#2563eb; display:inline-block; }
+    .brand .title { font-weight:600; letter-spacing:.2px; }
+    .container { max-width:980px; margin:32px auto; padding:0 16px; display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .card { background:#0b1220; border:1px solid #1f2937; border-radius:12px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,0.25); }
+    .card h2 { margin:0 0 12px; font-size:16px; color:#93c5fd; }
+    .input { width:100%; background:#0b1324; border:1px solid #1f2937; color:#e5e7eb; border-radius:8px; padding:10px 12px; outline:none; }
+    .row { display:flex; gap:12px; }
+    .row > * { flex:1; }
+    .btn { background:#2563eb; color:white; border:none; border-radius:8px; padding:10px 12px; cursor:pointer; }
+    .btn:disabled { opacity:.6; cursor:not-allowed; }
+    .status { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .badge { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #1f2937; background:#0b1324; color:#cbd5e1; }
+    .badge.ok { color:#10b981; border-color:#064e3b; background:#052116; }
+    .badge.err { color:#ef4444; border-color:#7f1d1d; background:#200b0b; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; color:#9ca3af; }
+    .kv { display:grid; grid-template-columns: 120px 1fr; gap:8px; }
+    .kv .k { color:#9ca3af; }
+    .kv .v { color:#e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="brand">
+    <span class="logo"></span>
+    <div class="title">Loki 指纹蜜罐</div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>模拟登录</h2>
+      <div class="row" style="margin-bottom:8px;">
+        <input id="username" class="input" placeholder="用户名" />
+        <input id="password" type="password" class="input" placeholder="密码" />
+      </div>
+      <div class="row">
+        <button id="loginBtn" class="btn">登录</button>
+      </div>
+      <div id="loginMsg" class="mono" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>指纹采集状态</h2>
+      <div class="status">
+        <span id="fpStatus" class="badge">指纹采集中…</span>
+        <span id="ipStatus" class="badge">IP获取中…</span>
+      </div>
+      <div style="margin-top:10px;" class="kv">
+        <div class="k">VisitorId</div><div id="visitorId" class="v mono">-</div>
+        <div class="k">CanvasId</div><div id="canvasId" class="v mono">-</div>
+        <div class="k">Remote IP</div><div id="remoteIp" class="v mono">-</div>
+        <div class="k">UA</div><div id="ua" class="v mono">-</div>
+        <div class="k">分辨率</div><div id="screen" class="v mono">-</div>
+        <div class="k">语言</div><div id="lang" class="v mono">-</div>
+        <div class="k">平台</div><div id="platform" class="v mono">-</div>
+        <div class="k">时区</div><div id="tz" class="v mono">-</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // FingerprintJS v5 - 与 01.html 保持一致的接入方式
+    const fpPromise = import('https://openfpcdn.io/fingerprintjs/v5')
+      .then(FingerprintJS => FingerprintJS.load());
+
+    // 简易 Canvas 指纹（作为 canvasId）
+    function getCanvasFingerprint() {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 200; canvas.height = 50;
+        ctx.textBaseline = 'top';
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(30, 10, 100, 20);
+        ctx.fillStyle = '#069';
+        ctx.fillText('Loki@Fingerprint', 10, 5);
+        ctx.strokeStyle = '#096';
+        ctx.arc(80, 10, 20, 0, Math.PI, false);
+        ctx.stroke();
+        const data = canvas.toDataURL();
+        // 简单哈希
+        let hash = 0;
+        for (let i = 0; i < data.length; i++) {
+          hash = ((hash << 5) - hash) + data.charCodeAt(i);
+          hash |= 0;
+        }
+        return 'c-' + Math.abs(hash).toString(16);
+      } catch (e) {
+        return '';
+      }
+    }
+
+    // 采集附加信息
+    function collectExtra() {
+      return {
+        screen: `${window.screen.width}x${window.screen.height}`,
+        lang: navigator.languages ? navigator.languages.join(',') : navigator.language || '',
+        platform: navigator.platform || '',
+        timezoneOffset: new Date().getTimezoneOffset(),
+      };
+    }
+
+    // 获取远端 IP（XFF / RemoteAddr）
+    async function fetchRemoteIp() {
+      try {
+        const r = await fetch('/api/webrtc/realip');
+        if (!r.ok) throw new Error('ip http error');
+        const j = await r.json();
+        return j.ip || '';
+      } catch (e) { return ''; }
+    }
+
+    const state = {
+      visitorId: '',
+      canvasId: '',
+      remoteIp: '',
+      ua: navigator.userAgent || '',
+      details: {}
+    };
+
+    async function initFingerprint() {
+      // Canvas 指纹
+      state.canvasId = getCanvasFingerprint();
+      document.getElementById('canvasId').textContent = state.canvasId || '-';
+
+      // 远端 IP
+      state.remoteIp = await fetchRemoteIp();
+      document.getElementById('remoteIp').textContent = state.remoteIp || '-';
+      document.getElementById('ipStatus').className = 'badge ' + (state.remoteIp ? 'ok' : 'err');
+      document.getElementById('ipStatus').textContent = state.remoteIp ? 'IP采集成功' : 'IP采集失败';
+
+      // FingerprintJS visitorId
+      try {
+        const fp = await fpPromise;
+        const result = await fp.get();
+        state.visitorId = result.visitorId || '';
+        document.getElementById('visitorId').textContent = state.visitorId || '-';
+        document.getElementById('fpStatus').className = 'badge ok';
+        document.getElementById('fpStatus').textContent = '指纹采集成功';
+      } catch (e) {
+        document.getElementById('fpStatus').className = 'badge err';
+        document.getElementById('fpStatus').textContent = '指纹采集失败';
+      }
+
+      // 展示附加信息
+      const extra = collectExtra();
+      state.details = extra;
+      document.getElementById('ua').textContent = state.ua;
+      document.getElementById('screen').textContent = extra.screen;
+      document.getElementById('lang').textContent = extra.lang;
+      document.getElementById('platform').textContent = extra.platform;
+      document.getElementById('tz').textContent = `${extra.timezoneOffset}min`;
+
+      // 上报到后端 /api/fp/log
+      try {
+        await fetch('/api/fp/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            visitorId: state.visitorId,
+            canvasId: state.canvasId,
+            method: 'GET',
+            path: location.pathname,
+            headers: '',
+            time: new Date().toISOString(),
+            userAgent: state.ua,
+            details: JSON.stringify({ remoteIp: state.remoteIp, ...extra })
+          })
+        });
+      } catch (e) {
+        console.warn('fp log failed', e);
+      }
+    }
+
+    initFingerprint();
+
+    // 模拟登录交互
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const msg = document.getElementById('loginMsg');
+      const payload = {
+        username,
+        password,
+        canvasId: state.canvasId || '',
+        userAgent: state.ua || '',
+        time: new Date().toISOString()
+      };
+      try {
+        const r = await fetch('/api/httplog/userInfo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const j = await r.json();
+        if (j.status === 'success') {
+          msg.textContent = '登录成功，正在跳转…';
+          msg.style.color = '#10b981';
+          if (j.redirect_url) location.href = j.redirect_url;
+        } else {
+          msg.textContent = (j.message || '用户名或密码错误，请重试。');
+          msg.style.color = '#ef4444';
+        }
+      } catch (e) {
+        msg.textContent = '登录失败：网络错误';
+        msg.style.color = '#ef4444';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -8,7 +8,13 @@ import net.thekingofduck.ningan.entity.CanvasEnity;
 import net.thekingofduck.ningan.entity.CommandEnity;
 import net.thekingofduck.ningan.entity.HttpLogEntity;
 import net.thekingofduck.ningan.entity.LogEvent;
+import net.thekingofduck.ningan.entity.WebRtcIpLog;
+import net.thekingofduck.ningan.entity.WebRtcIpLogRequest;
+import net.thekingofduck.ningan.entity.WebRtcIpRecord;
 import net.thekingofduck.ningan.entity.UserInfoEnity;
+import net.thekingofduck.ningan.entity.FingerprintLog;
+import net.thekingofduck.ningan.dto.FingerprintLogRequest;
+import net.thekingofduck.ningan.entity.FingerprintLog;
 import net.thekingofduck.ningan.mapper.HttpLogMapper;
 import net.thekingofduck.ningan.mapper.UserInfoMapper;
 import net.thekingofduck.ningan.model.ResultViewModelUtil;
@@ -17,6 +23,8 @@ import net.thekingofduck.ningan.service.DeepSeekService;
 import net.thekingofduck.ningan.service.HttpLogService; // 确保导入 HttpLogService
 import net.thekingofduck.ningan.service.UserService;
 import net.thekingofduck.ningan.service.LogEventService;
+import net.thekingofduck.ningan.service.WebRtcIpLogService;
+import net.thekingofduck.ningan.service.FingerprintLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -53,6 +61,11 @@ public class ApiController {
 
     @Autowired
     private DeepSeekService deepSeekService;
+
+    @Autowired
+    private WebRtcIpLogService webRtcIpLogService;
+    @Autowired
+    private FingerprintLogService fingerprintLogService;
 
     static Log log = LogFactory.get(Thread.currentThread().getStackTrace()[1].getClassName());
 
@@ -133,6 +146,61 @@ public class ApiController {
         }
 
         return new ResponseEntity<>(responseBody, headers, HttpStatus.OK);
+    }
+
+    // WebRTC: 返回远端 IP（XFF/CDN/RemoteAddr）
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @GetMapping("/webrtc/realip")
+    public Map<String, String> getRealIp(HttpServletRequest request) {
+        String clientIp = getClientIp(request);
+        Map<String, String> resp = new HashMap<>();
+        resp.put("ip", clientIp);
+        return resp;
+    }
+
+    // WebRTC: 批量接收并存储 IP 采集日志
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @PostMapping("/webrtc/iplog")
+    public ResponseEntity<String> saveWebRtcIps(@RequestBody WebRtcIpLogRequest req, HttpServletRequest request) {
+        try {
+            String ua = req.getUserAgent();
+            if (ua == null || ua.isEmpty()) {
+                ua = request.getHeader("User-Agent");
+            }
+            // 统一时间为上海时区
+            String time = req.getTime();
+            if (time != null && !time.isEmpty()) {
+                try {
+                    Instant instant = Instant.parse(time);
+                    ZoneId targetZone = ZoneId.of("Asia/Shanghai");
+                    ZonedDateTime zonedDateTime = instant.atZone(targetZone);
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    time = zonedDateTime.format(formatter);
+                } catch (Exception ignored) {}
+            } else {
+                ZonedDateTime nowInShanghai = ZonedDateTime.now(ZoneId.of("Asia/Shanghai"));
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                time = nowInShanghai.format(formatter);
+            }
+
+            if (req.getIps() != null) {
+                for (WebRtcIpRecord rec : req.getIps()) {
+                    WebRtcIpLog log = new WebRtcIpLog();
+                    log.setCanvasId(req.getCanvasId());
+                    log.setType(rec.getType());
+                    log.setAddress(rec.getAddress());
+                    log.setMethod(req.getMethod());
+                    log.setPath(req.getPath());
+                    log.setHeaders(req.getHeaders());
+                    log.setTime(time);
+                    log.setUserAgent(ua);
+                    webRtcIpLogService.save(log);
+                }
+            }
+            return ResponseEntity.ok("WebRTC IPs saved successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to save WebRTC IPs: " + e.getMessage());
+        }
     }
 
     @GetMapping("/userInfo/list")
@@ -427,5 +495,77 @@ public class ApiController {
         }
         logEventService.saveLogEvent(logEvent);
         return ResponseEntity.ok("Log saved successfully");
+    }
+
+    // 指纹日志采集接口：接收 FingerprintJS visitorId 等信息
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @PostMapping("/fp/log")
+    public ResponseEntity<String> saveFingerprintLog(@RequestBody FingerprintLogRequest req, HttpServletRequest request) {
+        try {
+            String ip = getClientIp(request);
+            String ua = req.getUserAgent();
+            if (ua == null || ua.isEmpty()) {
+                ua = request.getHeader("User-Agent");
+            }
+
+            String method = req.getMethod();
+            if (method == null || method.isEmpty()) {
+                method = request.getMethod();
+            }
+            String path = req.getPath();
+            if (path == null || path.isEmpty()) {
+                path = request.getRequestURI();
+            }
+
+            String headersJson = req.getHeaders();
+            if (headersJson == null || headersJson.isEmpty()) {
+                ObjectMapper objectMapper = new ObjectMapper();
+                headersJson = getHeadersAsJson(request, objectMapper);
+            }
+
+            // 统一时间为上海时区
+            String time = req.getTime();
+            if (time != null && !time.isEmpty()) {
+                try {
+                    Instant instant = Instant.parse(time);
+                    ZoneId targetZone = ZoneId.of("Asia/Shanghai");
+                    ZonedDateTime zonedDateTime = instant.atZone(targetZone);
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    time = zonedDateTime.format(formatter);
+                } catch (Exception ignored) {}
+            } else {
+                ZonedDateTime nowInShanghai = ZonedDateTime.now(ZoneId.of("Asia/Shanghai"));
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                time = nowInShanghai.format(formatter);
+            }
+
+            FingerprintLog logEntity = new FingerprintLog();
+            logEntity.setVisitorId(req.getVisitorId());
+            logEntity.setCanvasId(req.getCanvasId());
+            logEntity.setIp(ip);
+            logEntity.setUserAgent(ua);
+            logEntity.setMethod(method);
+            logEntity.setPath(path);
+            logEntity.setHeaders(headersJson);
+            logEntity.setTime(time);
+            logEntity.setDetails(req.getDetails());
+
+            fingerprintLogService.save(logEntity);
+            return ResponseEntity.ok("Fingerprint log saved successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to save fingerprint log: " + e.getMessage());
+        }
+    }
+
+    // 指纹日志查询接口：返回最近的记录
+    @CrossOrigin(origins = {"http://127.0.0.1:8090", "http://127.0.0.1:8080", "http://127.0.0.1:65535"})
+    @GetMapping("/fp/logs")
+    public ResponseEntity<List<FingerprintLog>> getFingerprintLogs(@RequestParam(value = "limit", required = false, defaultValue = "10") int limit) {
+        try {
+            List<FingerprintLog> logs = fingerprintLogService.listRecent(limit);
+            return ResponseEntity.ok(logs);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }
