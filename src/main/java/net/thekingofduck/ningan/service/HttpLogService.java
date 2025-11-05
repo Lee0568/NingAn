@@ -26,6 +26,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.net.URLDecoder; // 引入 URLDecoder
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -375,14 +376,14 @@ public class HttpLogService {
         for (HttpLogEntity log : allLogs) {
             String body = log.getBody();
             if (body == null || body.trim().isEmpty()) continue;
-            
+
             for (AttackPattern pattern : attackPatterns) {
                 if (pattern.matches(body)) {
                     attackTypes.add(pattern.getName());
                 }
             }
         }
-        
+
         // 统计今日攻击数
         java.time.LocalDate today = java.time.LocalDate.now();
         int todayAttacks = (int) allLogs.stream()
@@ -396,7 +397,7 @@ public class HttpLogService {
                     }
                 })
                 .count();
-        
+
         ObjectMapper objectMapper = new ObjectMapper();
         ObjectNode statsNode = objectMapper.createObjectNode();
         statsNode.put("totalAttacks", totalAttacks);
@@ -483,15 +484,15 @@ public class HttpLogService {
         ObjectMapper objectMapper = new ObjectMapper();
         ArrayNode datesArray = objectMapper.createArrayNode();
         ArrayNode countsArray = objectMapper.createArrayNode();
-        
+
         java.time.LocalDate today = java.time.LocalDate.now();
-        
+
         // 获取最近7天的数据，包括今天
         for (int i = 6; i >= 0; i--) {
             java.time.LocalDate date = today.minusDays(i);
             String dateStr = date.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"));
             long count = dailyAttackCounts.getOrDefault(date, 0L);
-            
+
             datesArray.add(dateStr);
             countsArray.add(count);
         }
@@ -512,7 +513,29 @@ public class HttpLogService {
         }
         String parameter = log.getParameter() != null ? log.getParameter() : "";
         String body = log.getBody() != null ? log.getBody() : "";
-        String contentToScan = parameter + " " + body;
+
+        // --- 解码逻辑 (之前被标记为用户要求修改的部分) ---
+        String decodedParameter = parameter;
+        if (!parameter.trim().isEmpty()) {
+            try {
+                // 对参数进行 URL 解码，使用 UTF-8 编码，这是 Web 应用最常用的编码
+                decodedParameter = URLDecoder.decode(parameter, StandardCharsets.UTF_8.name());
+            } catch (UnsupportedEncodingException e) {
+                // 如果不支持 UTF-8，理论上不应该发生
+                System.err.println("URL Decoder error: Unsupported Encoding.");
+                e.printStackTrace();
+            } catch (IllegalArgumentException e) {
+                // 如果参数包含无效的 URL 编码序列，例如 "%xy"
+                System.err.println("URL Decoder error: Invalid URL encoding sequence in parameter. Retaining original value.");
+                // 发生解析错误时，保留原始（可能编码的）值进行匹配，以防攻击者使用不规范的编码绕过
+                decodedParameter = parameter;
+            }
+        }
+
+        // 拼接解码后的参数和请求体进行扫描
+        String contentToScan = decodedParameter + " " + body;
+        // ----------------------------------------------
+
         if (contentToScan.trim().isEmpty()) {
             return "正常访问";
         }

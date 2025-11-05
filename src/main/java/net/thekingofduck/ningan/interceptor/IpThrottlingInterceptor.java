@@ -31,7 +31,6 @@ public class IpThrottlingInterceptor implements HandlerInterceptor {
 
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // 【修改点 1】：定义本机 IP 白名单集合
     private static final Set<String> LOCAL_WHITELIST_IPS = new HashSet<>(Arrays.asList(
             "127.0.0.1", // IPv4 本地回环地址
             "0:0:0:0:0:0:0:1", // IPv6 本地回环地址
@@ -47,13 +46,11 @@ public class IpThrottlingInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String ip = getClientIp(request);
 
-        // 【修改点 2】：白名单检查 - 优先放行本机流量
         if (LOCAL_WHITELIST_IPS.contains(ip)) {
             logger.debug("White-listed IP {} is granted access, skipping throttling and ban checks.", ip);
             return true;
         }
 
-        // --- 以下是原有的封禁和限流逻辑 ---
 
         Optional<BlockedIp> blockedIpOptional = blockedIpRepository.findById(ip);
         if (blockedIpOptional.isPresent()) {

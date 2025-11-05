@@ -131,7 +131,7 @@ public interface HttpLogMapper {
     /**
      * 根据canvasId从关联表httplog中查询出所有iP，body字段信息
      */
-    @Select("SELECT t2.iP, t2.body FROM canvas AS t1 JOIN httplog AS t2 ON t1.canvasId = t2.canvasId WHERE t1.canvasId = #{canvasId}")
+    @Select("SELECT t2.iP, t2.body, t2.parameter FROM canvas AS t1 JOIN httplog AS t2 ON t1.canvasId = t2.canvasId WHERE t1.canvasId = #{canvasId}")
     public List<HttpLogEntity> findIpsAndBodiesByCanvasId(String canvasId);
     /**
      * 插入canvasId到canvas表中时防止重复
